@@ -1,0 +1,2620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PhysiX AI — Simulation Stability Lab</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Clash+Display:wght@400;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root {
+  --bg: #060810;
+  --bg2: #0c0f1a;
+  --bg3: #111520;
+  --panel: #141828;
+  --panel2: #0f1320;
+  --border: #1e2438;
+  --border2: #242b42;
+  --accent: #00ffc6;
+  --accent2: #5b8fff;
+  --accent3: #ff6b6b;
+  --warn: #ffb830;
+  --danger: #ff4060;
+  --text: #d8dce8;
+  --muted: #5a6080;
+  --grid: rgba(0,255,198,0.025);
+  --glow: rgba(0,255,198,0.12);
+  --glow2: rgba(91,143,255,0.1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none; z-index: 0;
+}
+body::after {
+  content: '';
+  position: fixed;
+  top: -50%; left: -20%;
+  width: 60%; height: 80%;
+  background: radial-gradient(ellipse, rgba(0,255,198,0.04) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+
+/* ──── LAYOUT ──── */
+.wrap { position: relative; z-index: 1; max-width: 1380px; margin: 0 auto; padding: 0 18px 64px; }
+
+/* ──── HEADER ──── */
+header {
+  padding: 28px 0 22px;
+  display: flex; align-items: center; gap: 14px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 22px;
+}
+.logo-mark {
+  width: 46px; height: 46px; border-radius: 12px; flex-shrink: 0;
+  background: conic-gradient(from 180deg, var(--accent), var(--accent2), var(--accent));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; color: #060810; font-weight: 800;
+  box-shadow: 0 0 28px rgba(0,255,198,0.2), 0 8px 24px rgba(0,0,0,0.4);
+}
+.header-info h1 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.18rem; font-weight: 700; letter-spacing: -0.01em;
+}
+.header-info h1 .accent { color: var(--accent); }
+.header-info p { margin-top: 2px; font-size: 0.62rem; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+.header-badges { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.hbadge {
+  font-size: 0.6rem; padding: 4px 10px; border-radius: 999px;
+  border: 1px solid; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
+}
+.hbadge.v2 { border-color: rgba(0,255,198,0.3); color: var(--accent); background: rgba(0,255,198,0.06); }
+.hbadge.ai { border-color: rgba(91,143,255,0.3); color: var(--accent2); background: rgba(91,143,255,0.06); }
+.hbadge.new { border-color: rgba(255,184,48,0.3); color: var(--warn); background: rgba(255,184,48,0.06); }
+@media (max-width: 860px) {
+  .header-badges { display: none; }
+  header { align-items: flex-start; }
+}
+
+/* ──── MAIN LAYOUT ──── */
+.main-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 18px; align-items: start;
+}
+@media (max-width: 920px) { .main-grid { grid-template-columns: 1fr; } }
+
+/* ──── PANEL ──── */
+.panel {
+  background: linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%);
+  border: 1px solid var(--border); border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03);
+}
+.panel + .panel { margin-top: 16px; }
+.panel-head {
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+}
+.panel-head .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); flex-shrink: 0; }
+.panel-head .dot.blue { background: var(--accent2); box-shadow: 0 0 8px var(--accent2); }
+.panel-head .dot.warn { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+.panel-body { padding: 16px; }
+
+/* ──── FORM ──── */
+label {
+  display: block; font-size: 0.6rem; color: var(--muted);
+  letter-spacing: 0.08em; text-transform: uppercase;
+  margin-bottom: 5px; margin-top: 12px;
+}
+label:first-child { margin-top: 0; }
+select, input[type="number"], input[type="text"], input[type="file"] {
+  width: 100%; background: var(--bg2); color: var(--text);
+  border: 1px solid var(--border2); border-radius: 8px;
+  padding: 9px 10px; font-family: 'JetBrains Mono', monospace; font-size: 0.74rem;
+  outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+}
+select:focus, input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,255,198,0.07); }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.range-row { display: flex; align-items: center; gap: 8px; }
+.range-val { min-width: 42px; font-size: 0.7rem; color: var(--accent); text-align: right; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+
+/* ──── BUTTONS ──── */
+.btn {
+  width: 100%; padding: 10px 12px; border-radius: 9px; border: none; cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s, opacity 0.1s;
+  font-size: 0.75rem; font-family: 'JetBrains Mono', monospace;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  margin-top: 12px;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent) 0%, #00e0b0 100%);
+  color: #060810; font-weight: 700;
+  box-shadow: 0 6px 22px rgba(0,255,198,0.22);
+}
+.btn-primary:disabled { opacity: 0.4; transform: none; box-shadow: none; cursor: not-allowed; }
+.btn-ghost { background: transparent; border: 1px solid var(--border2); color: var(--text); }
+.btn-ghost:hover { border-color: var(--accent2); color: var(--accent2); }
+.btn-blue {
+  background: linear-gradient(135deg, var(--accent2), #3a72ff);
+  color: #fff; font-weight: 700;
+  box-shadow: 0 6px 20px rgba(91,143,255,0.2);
+}
+.btn-danger {
+  background: linear-gradient(135deg, var(--danger), #cc2244);
+  color: #fff; font-weight: 700;
+}
+.btn-small { padding: 7px 10px; font-size: 0.68rem; margin-top: 0; }
+.btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+
+/* ──── ALERTS / NOTES ──── */
+.alert-banner {
+  display: none; border-radius: 9px; padding: 10px 12px;
+  margin-bottom: 12px; font-size: 0.68rem; line-height: 1.6;
+  background: rgba(255,64,96,0.07); border: 1px solid rgba(255,64,96,0.2); color: #ffaabb;
+}
+.note {
+  background: rgba(91,143,255,0.07); border: 1px solid rgba(91,143,255,0.15);
+  border-radius: 9px; padding: 9px 11px; margin-top: 12px;
+  color: #a0bcff; font-size: 0.65rem; line-height: 1.7;
+}
+.note.green { background: rgba(0,255,198,0.05); border-color: rgba(0,255,198,0.12); color: #99ffdd; }
+.note.warn { background: rgba(255,184,48,0.07); border-color: rgba(255,184,48,0.18); color: #ffdb80; }
+
+/* ──── SCORE RING ──── */
+.score-ring-wrap { display: flex; flex-direction: column; align-items: center; padding-top: 6px; }
+.score-ring { position: relative; width: 128px; height: 128px; }
+.score-ring svg { transform: rotate(-90deg); }
+.ring-bg { fill: none; stroke: var(--border2); stroke-width: 8; }
+.ring-fill { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset .8s cubic-bezier(.4,0,.2,1), stroke .25s; }
+.score-center {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.score-num { font-size: 1.9rem; font-weight: 700; line-height: 1; }
+.score-label { font-size: 0.55rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+.score-title { margin-top: 8px; text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.6rem; color: var(--muted); }
+.score-subtext { margin-top: 10px; font-size: 0.68rem; color: var(--muted); text-align: center; line-height: 1.7; }
+.metric-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; margin-top: 12px; }
+.metric-box {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 9px; padding: 11px;
+}
+.metric-box .m-val { font-size: 1.15rem; font-weight: 700; line-height: 1; }
+.metric-box .m-label { margin-top: 4px; font-size: 0.58rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.good { color: var(--accent); }
+.warn { color: var(--warn); }
+.danger { color: var(--danger); }
+.blue { color: var(--accent2); }
+
+/* ──── CATEGORY BARS ──── */
+.cat-wrap { margin-top: 14px; }
+.cat-row { display: flex; align-items: center; gap: 9px; margin-bottom: 7px; }
+.cat-name { width: 108px; flex-shrink: 0; color: var(--muted); font-size: 0.6rem; }
+.cat-bar { flex: 1; height: 6px; background: var(--bg2); border-radius: 999px; overflow: hidden; }
+.cat-fill { height: 100%; border-radius: 999px; transition: width .7s ease; }
+.cat-val { min-width: 28px; text-align: right; font-size: 0.6rem; }
+
+/* ──── TABS ──── */
+.tabs { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--border); overflow-x: auto; }
+.tab {
+  padding: 10px 14px; font-size: 0.62rem; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer; white-space: nowrap;
+  border-bottom: 2px solid transparent; transition: color 0.12s, border-color 0.12s; flex-shrink: 0;
+}
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-content { display: none; padding: 16px; }
+.tab-content.active { display: block; }
+
+/* ──── CHAT ──── */
+.chat-area {
+  height: 400px; overflow-y: auto; display: flex; flex-direction: column;
+  gap: 12px; padding: 16px; scroll-behavior: smooth;
+}
+.chat-area::-webkit-scrollbar { width: 3px; }
+.chat-area::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 999px; }
+.msg { display: flex; gap: 9px; align-items: flex-start; }
+.msg-avatar {
+  width: 28px; height: 28px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; flex-shrink: 0;
+}
+.msg-avatar.ai { background: linear-gradient(135deg, #0a2820, #051a12); border: 1px solid rgba(0,255,198,0.2); }
+.msg-avatar.user { background: var(--bg3); border: 1px solid var(--border2); }
+.msg-bubble {
+  flex: 1; background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: 0 11px 11px 11px; padding: 11px 13px;
+  font-size: 0.72rem; line-height: 1.75;
+}
+.msg.user { flex-direction: row-reverse; }
+.msg.user .msg-bubble {
+  background: rgba(91,143,255,0.07); border-color: rgba(91,143,255,0.16);
+  border-radius: 11px 0 11px 11px;
+}
+.msg-bubble strong { color: var(--accent); }
+.msg-bubble code {
+  background: rgba(0,255,198,0.07); border: 1px solid rgba(0,255,198,0.14);
+  padding: 1px 4px; border-radius: 4px; font-size: 0.88em;
+}
+.quick-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 10px; }
+.chip {
+  border: 1px solid var(--border2); background: var(--bg3); color: var(--muted);
+  padding: 4px 9px; border-radius: 999px; font-size: 0.6rem; cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+}
+.chip:hover { color: var(--accent2); border-color: var(--accent2); }
+.chat-input-row {
+  display: flex; gap: 7px; padding: 10px 16px;
+  border-top: 1px solid var(--border); background: rgba(6,8,16,0.7);
+}
+.chat-input {
+  flex: 1; background: var(--bg3); border: 1px solid var(--border2); border-radius: 9px;
+  padding: 9px 11px; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+  color: var(--text); outline: none;
+}
+.chat-input:focus { border-color: var(--accent2); box-shadow: 0 0 0 3px rgba(91,143,255,0.08); }
+.chat-send {
+  width: 38px; height: 38px; border: none; border-radius: 9px;
+  background: var(--accent2); color: #fff; font-size: 14px; cursor: pointer;
+}
+.chat-send:disabled { opacity: 0.4; cursor: not-allowed; }
+.typing { display: flex; gap: 4px; padding: 3px 0; }
+.typing span { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: bounce 1s infinite ease-in-out; }
+.typing span:nth-child(2) { animation-delay: .15s; }
+.typing span:nth-child(3) { animation-delay: .3s; }
+@keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+
+/* ──── EVENTS & CAUSES ──── */
+.event-list { display: flex; flex-direction: column; gap: 8px; }
+.event-item {
+  background: var(--bg2); border: 1px solid var(--border); border-left-width: 3px;
+  border-radius: 10px; padding: 11px;
+}
+.event-item.sev-high { border-left-color: var(--danger); }
+.event-item.sev-med { border-left-color: var(--warn); }
+.event-item.sev-low { border-left-color: var(--accent2); }
+.event-kind { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.event-meta { margin-top: 3px; color: var(--muted); font-size: 0.62rem; line-height: 1.6; }
+.cause-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 13px; margin-bottom: 9px; }
+.cause-name { font-size: 0.72rem; font-weight: 700; margin-bottom: 5px; }
+.conf-bar { height: 4px; background: var(--border); border-radius: 999px; overflow: hidden; margin-bottom: 7px; }
+.conf-fill { height: 100%; border-radius: 999px; }
+.evidence { font-size: 0.63rem; color: var(--muted); line-height: 1.65; }
+.fix-item { display: flex; align-items: flex-start; gap: 7px; margin: 6px 0; }
+.fix-icon { flex-shrink: 0; background: rgba(0,255,198,0.08); border: 1px solid rgba(0,255,198,0.18); color: var(--accent); border-radius: 4px; padding: 1px 5px; font-size: 0.58rem; margin-top: 1px; }
+.empty-state { display: flex; flex-direction: column; align-items: center; gap: 9px; padding: 38px 18px; color: var(--muted); text-align: center; font-size: 0.72rem; }
+.empty-state .icon { font-size: 1.8rem; }
+.section-title {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em;
+  display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+}
+.section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* ──── CHARTS ──── */
+canvas { width: 100%; display: block; border-radius: 6px; }
+
+/* ──── COMPARE PANEL ──── */
+.compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 640px) { .compare-grid { grid-template-columns: 1fr; } }
+.compare-side { background: var(--bg2); border: 1px solid var(--border2); border-radius: 10px; padding: 12px; }
+.compare-side h4 { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+.compare-score {
+  font-size: 2rem; font-weight: 700; text-align: center; margin: 8px 0 2px;
+  line-height: 1;
+}
+.compare-label { text-align: center; font-size: 0.62rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+.compare-row { display: flex; justify-content: space-between; font-size: 0.64rem; padding: 3px 0; border-bottom: 1px solid var(--border); }
+.compare-row:last-child { border-bottom: none; }
+.compare-row .k { color: var(--muted); }
+.compare-row .v { font-weight: 600; }
+.compare-verdict {
+  margin-top: 14px; background: var(--bg3); border: 1px solid var(--border); border-radius: 9px; padding: 12px;
+  font-size: 0.7rem; line-height: 1.7;
+}
+.compare-verdict strong { color: var(--accent); }
+
+/* ──── UPLOAD PANEL ──── */
+.upload-zone {
+  border: 2px dashed var(--border2); border-radius: 12px;
+  padding: 28px 16px; text-align: center; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  background: var(--bg2); margin-bottom: 12px;
+}
+.upload-zone:hover, .upload-zone.drag-over { border-color: var(--accent2); background: rgba(91,143,255,0.04); }
+.upload-zone .uz-icon { font-size: 2rem; margin-bottom: 8px; }
+.upload-zone p { font-size: 0.68rem; color: var(--muted); line-height: 1.6; }
+.upload-zone p strong { color: var(--text); }
+.upload-result { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 13px; margin-top: 10px; }
+.upload-result .ur-name { font-size: 0.68rem; color: var(--accent); margin-bottom: 8px; font-weight: 700; }
+.upload-result .ur-stats { font-size: 0.62rem; color: var(--muted); line-height: 1.8; }
+.upload-result .ur-preview { margin-top: 8px; }
+
+/* ──── 3D VIEWER ──── */
+#viewer-3d {
+  width: 100%; height: 320px; border-radius: 10px;
+  background: radial-gradient(ellipse at 50% 30%, #0a1a2e 0%, #04080f 70%);
+  overflow: hidden; position: relative;
+}
+.viewer-label {
+  position: absolute; top: 10px; left: 12px;
+  font-size: 0.6rem; color: rgba(0,255,198,0.6); text-transform: uppercase; letter-spacing: 0.08em;
+  pointer-events: none;
+}
+.viewer-system-label {
+  position: absolute; bottom: 10px; right: 12px;
+  font-size: 0.58rem; color: var(--muted); pointer-events: none;
+}
+
+/* ──── TUNING PANEL ──── */
+.tuning-run {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 9px;
+  padding: 9px 12px; margin-bottom: 7px; display: flex; align-items: center; gap: 10px;
+}
+.tuning-run .tr-num { font-size: 0.62rem; color: var(--muted); min-width: 24px; }
+.tuning-run .tr-params { flex: 1; font-size: 0.63rem; color: var(--text); }
+.tuning-run .tr-score { font-size: 0.88rem; font-weight: 700; }
+.tuning-progress { margin: 12px 0; }
+.tuning-bar { height: 6px; background: var(--border); border-radius: 999px; overflow: hidden; margin-top: 4px; }
+.tuning-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent2), var(--accent)); transition: width 0.3s ease; }
+
+/* ──── PRESENTATION ──── */
+.summary-card {
+  border: 1px solid var(--border); background: var(--bg2);
+  border-radius: 11px; padding: 13px; line-height: 1.75; font-size: 0.7rem;
+}
+.summary-card strong { color: var(--accent); }
+.mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.mini-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+.mini-card h4 { font-size: 0.66rem; color: var(--accent2); margin-bottom: 6px; font-weight: 700; }
+.mini-card p { font-size: 0.64rem; color: var(--muted); line-height: 1.6; }
+.footer-note { margin-top: 14px; font-size: 0.62rem; color: var(--muted); line-height: 1.6; }
+.footer-note strong { color: var(--text); }
+
+/* ──── SPIN ──── */
+.spin { width: 11px; height: 11px; border: 2px solid rgba(6,8,16,0.3); border-top-color: #060810; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ──── SCROLL ──── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 999px; }
+
+/* ──── TOOLTIP ──── */
+.badge-pill {
+  display: inline-block; font-size: 0.6rem; padding: 2px 7px; border-radius: 999px;
+  font-weight: 600; letter-spacing: 0.04em;
+}
+.badge-pill.good { background: rgba(0,255,198,0.12); color: var(--accent); border: 1px solid rgba(0,255,198,0.2); }
+.badge-pill.warn { background: rgba(255,184,48,0.1); color: var(--warn); border: 1px solid rgba(255,184,48,0.2); }
+.badge-pill.danger { background: rgba(255,64,96,0.1); color: var(--danger); border: 1px solid rgba(255,64,96,0.2); }
+
+/* ──── AI BADGE ──── */
+.ai-mode-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 0.58rem; padding: 3px 8px; border-radius: 999px;
+  border: 1px solid rgba(91,143,255,0.25); background: rgba(91,143,255,0.06); color: var(--accent2);
+  margin-left: 8px;
+}
+
+/* ──── UPLOAD COLUMN ──── */
+.log-field { margin-bottom: 6px; font-size: 0.64rem; }
+.log-field .lf-key { color: var(--muted); }
+.log-field .lf-val { color: var(--text); }
+
+/* ──── SECTION LABEL ──── */
+.sub-label {
+  font-size: 0.58rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em;
+  margin-bottom: 4px; margin-top: 12px;
+}
+
+/* ──── SYSTEM BADGES (new systems) ──── */
+.sys-tag {
+  display: inline-block; font-size: 0.55rem; padding: 1px 6px; border-radius: 4px;
+  font-weight: 700; letter-spacing: 0.06em; margin-left: 4px; vertical-align: middle;
+}
+.sys-tag.new { background: rgba(255,107,107,0.15); color: var(--accent3); border: 1px solid rgba(255,107,107,0.25); }
+.sys-tag.chaotic { background: rgba(255,184,48,0.12); color: var(--warn); border: 1px solid rgba(255,184,48,0.22); }
+
+/* ──── HISTORY ──── */
+.history-row {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 9px;
+  padding: 10px 13px; margin-bottom: 7px; display: flex; align-items: center; gap: 12px;
+}
+.history-row .hr-num { font-size: 0.6rem; color: var(--muted); min-width: 22px; }
+.history-row .hr-sys { flex: 1; font-size: 0.68rem; }
+.history-row .hr-int { font-size: 0.6rem; color: var(--muted); min-width: 52px; text-align: right; }
+.history-row .hr-score { font-size: 1.1rem; font-weight: 700; min-width: 44px; text-align: right; }
+.history-row .hr-time { font-size: 0.58rem; color: var(--muted); }
+.history-best { border-color: rgba(0,255,198,0.3); background: rgba(0,255,198,0.03); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- ──── HEADER ──── -->
+  <header>
+    <div class="logo-mark">⚛</div>
+    <div class="header-info">
+      <h1><span class="accent">PhysiX</span> AI</h1>
+      <p>Simulation Stability Lab · AI Debugging Agent · Benchmark Lab</p>
+    </div>
+    <div class="header-badges">
+      <span class="hbadge v2">eyoukress</span>
+      <span class="hbadge ai">Aurora Stage 2</span>
+      <span class="hbadge new">3D Viewer</span>
+      <span class="hbadge new">Log Upload</span>
+      <span class="hbadge new">Auto-Tune</span>
+    </div>
+  </header>
+
+  <!-- ──── MAIN ──── -->
+  <div class="main-grid">
+    <!-- LEFT SIDEBAR -->
+    <div>
+      <!-- SIMULATION CONFIG -->
+      <div class="panel">
+        <div class="panel-head"><div class="dot"></div>Simulation Config</div>
+        <div class="panel-body">
+          <div id="risk-banner" class="alert-banner"></div>
+
+          <label>Physics System</label>
+          <select id="sel-system" onchange="UI.onSystemChange()">
+            <option value="spring_mass">Spring-Mass Chain</option>
+            <option value="pendulum">Damped Pendulum</option>
+            <option value="double_pendulum">Double Pendulum — Chaotic</option>
+            <option value="orbital">Orbital Mechanics — Orbital</option>
+            <option value="nbody">3-Body Gravity — Chaotic</option>
+          </select>
+
+          <label>Integrator</label>
+          <select id="sel-integrator" onchange="UI.previewRisk()">
+            <option value="euler">Euler (Explicit)</option>
+            <option value="semi_euler">Semi-Implicit Euler</option>
+            <option value="verlet" selected>Velocity-Verlet</option>
+            <option value="rk4">Runge-Kutta 4</option>
+          </select>
+
+          <label>Timestep (dt)</label>
+          <div class="range-row">
+            <input type="range" id="sl-dt" min="0.001" max="0.15" step="0.001" value="0.02" oninput="$('lbl-dt').textContent=Number(this.value).toFixed(3);UI.previewRisk()">
+            <span class="range-val" id="lbl-dt">0.020</span>
+          </div>
+
+          <label>Damping</label>
+          <div class="range-row">
+            <input type="range" id="sl-damp" min="0" max="2" step="0.01" value="0.15" oninput="$('lbl-damp').textContent=Number(this.value).toFixed(2);UI.previewRisk()">
+            <span class="range-val" id="lbl-damp">0.15</span>
+          </div>
+
+          <label>Stiffness / k</label>
+          <div class="range-row">
+            <input type="range" id="sl-k" min="1" max="300" step="1" value="20" oninput="$('lbl-k').textContent=this.value;UI.previewRisk()">
+            <span class="range-val" id="lbl-k">20</span>
+          </div>
+
+          <label>Duration (s)</label>
+          <div class="range-row">
+            <input type="range" id="sl-dur" min="1" max="20" step="0.5" value="8" oninput="$('lbl-dur').textContent=Number(this.value).toFixed(1)">
+            <span class="range-val" id="lbl-dur">8.0</span>
+          </div>
+
+          <button class="btn btn-primary" id="btn-run" onclick="runSim()">
+            <span id="btn-run-text">▶ Run & Analyze</span>
+          </button>
+
+          <div class="sub-label" style="margin-top:14px">Quick Presets</div>
+          <div class="two-col">
+            <button class="btn btn-ghost btn-small" onclick="loadPreset('unstable')">💥 Unstable</button>
+            <button class="btn btn-ghost btn-small" onclick="loadPreset('stiff')">🔩 Stiff</button>
+            <button class="btn btn-ghost btn-small" onclick="loadPreset('stable')">✅ Stable</button>
+            <button class="btn btn-ghost btn-small" onclick="loadPreset('chaotic')">🌀 Chaotic</button>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-ghost btn-small" onclick="exportJSON()">⬇ JSON</button>
+            <button class="btn btn-ghost btn-small" onclick="exportReport()">📄 Report</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- STABILITY SCORE -->
+      <div class="panel">
+        <div class="panel-head"><div class="dot"></div>Stability Analysis</div>
+        <div class="panel-body">
+          <div class="score-ring-wrap">
+            <div class="score-ring">
+              <svg width="128" height="128" viewBox="0 0 128 128">
+                <circle class="ring-bg" cx="64" cy="64" r="55"></circle>
+                <circle class="ring-fill" id="ring-fill" cx="64" cy="64" r="55" stroke="var(--accent)" stroke-dasharray="345.4" stroke-dashoffset="345.4"></circle>
+              </svg>
+              <div class="score-center">
+                <div class="score-num" id="score-num">—</div>
+                <div class="score-label">/ 100</div>
+              </div>
+            </div>
+            <div class="score-title" id="score-title">Run a simulation</div>
+            <div class="score-subtext" id="score-subtext">Configure a system above and run it. The AI will analyze stability, find root causes, and suggest the fastest fix path.</div>
+          </div>
+
+          <div id="metrics-grid" class="metric-grid" style="display:none">
+            <div class="metric-box"><div class="m-val" id="m-edrift">—</div><div class="m-label">Energy Drift</div></div>
+            <div class="metric-box"><div class="m-val" id="m-events">—</div><div class="m-label">Events</div></div>
+            <div class="metric-box"><div class="m-val" id="m-accel">—</div><div class="m-label">Accel Spike</div></div>
+            <div class="metric-box"><div class="m-val" id="m-stiff">—</div><div class="m-label">Stiffness Idx</div></div>
+          </div>
+
+          <div class="cat-wrap" id="category-bars" style="display:none"></div>
+        </div>
+      </div>
+
+      <!-- AUTO-TUNE PANEL -->
+      <div class="panel">
+        <div class="panel-head"><div class="dot blue"></div>Auto-Tune AI Stabilizer</div>
+        <div class="panel-body">
+          <p style="font-size:0.66rem;color:var(--muted);line-height:1.6;margin-bottom:10px">
+            AI tries 10 parameter combinations to find the most stable configuration automatically.
+          </p>
+          <div id="tuning-progress" style="display:none">
+            <div class="tuning-progress">
+              <div style="font-size:0.62rem;color:var(--muted)">Testing <span id="tune-step">0</span>/10 combinations…</div>
+              <div class="tuning-bar"><div class="tuning-fill" id="tune-progress-fill" style="width:0%"></div></div>
+            </div>
+          </div>
+          <div id="tuning-results"></div>
+          <button class="btn btn-blue btn-small" onclick="autoTune()" id="btn-autotune" style="margin-top:8px">
+            <span id="btn-autotune-text">🔬 Auto-Tune (10 runs)</span>
+          </button>
+          <button class="btn btn-ghost btn-small" onclick="autoFixConfig()" style="margin-top:6px">⚡ Quick Auto-Fix</button>
+          <button class="btn btn-ghost btn-small" onclick="runIntegratorBenchmark()" style="margin-top:6px">📈 Benchmark Integrators</button>
+          <div id="benchmark-results" style="margin-top:10px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT MAIN AREA -->
+    <div>
+      <!-- BIG TAB PANEL -->
+      <div class="panel">
+        <div class="tabs">
+          <div class="tab active" onclick="switchTab('tab-ai', this)">🤖 AI Debug Chat</div>
+          <div class="tab" onclick="switchTab('tab-compare', this)">⚖️ Compare</div>
+          <div class="tab" onclick="switchTab('tab-upload', this)">📂 Upload Logs</div>
+          <div class="tab" onclick="switchTab('tab-events', this)">⚡ Events</div>
+          <div class="tab" onclick="switchTab('tab-causes', this)">🔍 Root Causes</div>
+          <div class="tab" onclick="switchTab('tab-chart', this); redrawCharts()">📊 Charts</div>
+          <div class="tab" onclick="switchTab('tab-3d', this); init3D()">🧊 3D View</div>
+          <div class="tab" onclick="switchTab('tab-anim', this); initAnim()">🎬 Live Sim</div>
+          <div class="tab" onclick="switchTab('tab-heatmap', this)">🗺 Heatmap</div>
+          <div class="tab" onclick="switchTab('tab-history', this)">📋 History</div>
+        </div>
+
+        <!-- AI CHAT TAB -->
+        <div id="tab-ai" class="tab-content active" style="padding:0">
+          <div class="chat-area" id="chat-area">
+            <div class="msg">
+              <div class="msg-avatar ai">⚛</div>
+              <div class="msg-bubble">
+                Hello — I'm <strong>PhysiX AI</strong>, your intelligent physics simulation debugging agent.<br><br>
+                I analyze simulation health, detect instability, explain root causes, and recommend the fastest repair path.<br><br>
+                <strong>Features:</strong> Upload external logs, compare two runs, auto-tune parameters, view simulations in 3D, and run chaotic systems like the double pendulum and 3-body problem.<br><br>
+                Try a preset, run a simulation, or ask me anything.
+              </div>
+            </div>
+          </div>
+          <div class="quick-chips">
+            <span class="chip" onclick="sendQ('Why is Euler integration unstable?')">Euler unstable?</span>
+            <span class="chip" onclick="sendQ('What does energy drift mean for my simulation?')">Energy drift?</span>
+            <span class="chip" onclick="sendQ('Explain double pendulum chaos for judges')">Double pendulum chaos?</span>
+            <span class="chip" onclick="sendQ('What is the best integrator for stiff systems?')">Best integrator?</span>
+            <span class="chip" onclick="sendQ('Explain this simulation result for hackathon judges')">Explain for judges</span>
+            <span class="chip" onclick="sendQ('Compare Euler vs Verlet on this system')">Euler vs Verlet?</span>
+          </div>
+          <div class="chat-input-row">
+            <input id="chat-input" class="chat-input" placeholder="Ask the AI about your simulation…" />
+            <button class="chat-send" id="chat-send" onclick="sendChat()">➤</button>
+          </div>
+        </div>
+
+        <!-- COMPARE TAB -->
+        <div id="tab-compare" class="tab-content">
+          <div class="section-title">Simulation Comparison</div>
+          <p style="font-size:0.66rem;color:var(--muted);line-height:1.6;margin-bottom:14px">
+            Run Simulation A, click <strong>Save as A</strong>, then change settings, run again, and click <strong>Save as B</strong> to compare.
+          </p>
+          <div style="display:flex;gap:8px;margin-bottom:14px">
+            <button class="btn btn-ghost btn-small" style="margin-top:0" onclick="saveCompareSlot('A')">💾 Save as A</button>
+            <button class="btn btn-ghost btn-small" style="margin-top:0" onclick="saveCompareSlot('B')">💾 Save as B</button>
+            <button class="btn btn-blue btn-small" style="margin-top:0" onclick="runComparison()">⚖️ Compare</button>
+          </div>
+          <div id="compare-output">
+            <div class="empty-state"><div class="icon">⚖️</div>Save two simulation results to compare them side-by-side.</div>
+          </div>
+        </div>
+
+        <!-- UPLOAD LOGS TAB -->
+        <div id="tab-upload" class="tab-content">
+          <div class="section-title">Upload External Simulation Logs</div>
+          <div class="upload-zone" id="upload-zone" onclick="$('file-input').click()" ondragover="handleDragOver(event)" ondrop="handleDrop(event)" ondragleave="this.classList.remove('drag-over')">
+            <div class="uz-icon">📂</div>
+            <p><strong>Click to upload or drag & drop</strong><br>Supports CSV and JSON log files<br><span style="font-size:0.6rem;color:var(--muted)">Robotics logs · Game engine data · Engineering experiments</span></p>
+          </div>
+          <input type="file" id="file-input" accept=".csv,.json" style="display:none" onchange="handleFileUpload(event)">
+          <div id="upload-result"></div>
+          <div class="note">
+            <strong>Expected CSV format:</strong> columns like <code>t, x, energy, velocity</code> — or any time-series data.<br>
+            <strong>JSON format:</strong> <code>{"ts":[...], "energies":[...], "primary":[...]}</code>
+          </div>
+        </div>
+
+        <!-- EVENTS TAB -->
+        <div id="tab-events" class="tab-content">
+          <div id="events-content">
+            <div class="empty-state"><div class="icon">⚡</div>Run a simulation to detect instability events.</div>
+          </div>
+        </div>
+
+        <!-- CAUSES TAB -->
+        <div id="tab-causes" class="tab-content">
+          <div id="causes-content">
+            <div class="empty-state"><div class="icon">🔍</div>Root-cause analysis will appear after a simulation run.</div>
+          </div>
+        </div>
+
+        <!-- CHARTS TAB -->
+        <div id="tab-chart" class="tab-content">
+          <div class="section-title">Energy Over Time</div>
+          <canvas id="chart-energy" height="170"></canvas>
+          <div class="section-title" style="margin-top:16px">Acceleration Magnitude</div>
+          <canvas id="chart-accel" height="170"></canvas>
+          <div class="section-title" style="margin-top:16px">Primary Position / Angle</div>
+          <canvas id="chart-pos" height="170"></canvas>
+        </div>
+
+        <!-- 3D VIEW TAB -->
+        <div id="tab-3d" class="tab-content" style="padding:12px">
+          <div class="section-title">3D Simulation Viewer</div>
+          <div id="viewer-3d">
+            <div class="viewer-label">3D PHYSICS VIEW</div>
+            <div class="viewer-system-label" id="viewer-sys-label">Run a simulation first</div>
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button class="btn btn-ghost btn-small" style="margin-top:0" onclick="toggle3DAnimation()">⏯ Play/Pause</button>
+            <button class="btn btn-ghost btn-small" style="margin-top:0" onclick="reset3DCamera()">🎥 Reset Camera</button>
+          </div>
+          <div class="note" style="margin-top:10px">
+            Drag to orbit · Scroll to zoom · Shows real simulation data in 3D space
+          </div>
+        </div>
+
+        <!-- LIVE 2D ANIMATION TAB -->
+        <div id="tab-anim" class="tab-content" style="padding:12px">
+          <div class="section-title">Live 2D Simulation Playback</div>
+          <canvas id="anim-canvas" height="320" style="width:100%;border-radius:10px;background:radial-gradient(ellipse at 50% 20%, #0a1e2e 0%, #04080f 80%);display:block;cursor:crosshair"></canvas>
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-primary btn-small" style="margin-top:0;flex:1" onclick="animPlay()" id="btn-anim-play">▶ Play</button>
+            <button class="btn btn-ghost btn-small" style="margin-top:0;flex:1" onclick="animPause()" id="btn-anim-pause">⏸ Pause</button>
+            <button class="btn btn-ghost btn-small" style="margin-top:0;flex:1" onclick="animReset()">↺ Reset</button>
+          </div>
+          <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
+            <label style="margin:0;min-width:56px">Speed</label>
+            <input type="range" id="anim-speed" min="0.25" max="4" step="0.25" value="1" style="flex:1" oninput="$('anim-speed-lbl').textContent=this.value+'×'">
+            <span class="range-val" id="anim-speed-lbl">1×</span>
+          </div>
+          <div class="note" style="margin-top:10px" id="anim-note">Run a simulation first, then come here to watch it play back in real time.</div>
+        </div>
+
+        <!-- STABILITY HEATMAP TAB -->
+        <div id="tab-heatmap" class="tab-content" style="padding:12px">
+          <div class="section-title">Parameter Sensitivity Heatmap</div>
+          <p style="font-size:0.65rem;color:var(--muted);line-height:1.6;margin-bottom:12px">
+            Scans a grid of <strong>dt</strong> vs <strong>damping</strong> values and scores stability for each combination. Shows which regions are safe vs explosive.
+          </p>
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <button class="btn btn-blue btn-small" style="margin-top:0;flex:1" onclick="runHeatmap()" id="btn-heatmap">🗺 Generate Heatmap</button>
+          </div>
+          <div id="heatmap-progress" style="display:none;margin-bottom:10px">
+            <div style="font-size:0.62rem;color:var(--muted);margin-bottom:4px">Computing <span id="hm-step">0</span>/100 cells…</div>
+            <div class="tuning-bar"><div class="tuning-fill" id="hm-fill" style="width:0%"></div></div>
+          </div>
+          <canvas id="heatmap-canvas" width="600" height="360" style="width:100%;border-radius:10px;display:block"></canvas>
+          <div id="heatmap-legend" style="display:none;margin-top:10px">
+            <div style="display:flex;align-items:center;gap:8px;font-size:0.62rem;color:var(--muted)">
+              <div style="width:120px;height:8px;border-radius:4px;background:linear-gradient(90deg,#ff4060,#ffb830,#00ffc6)"></div>
+              <span>Unstable (0) → Marginal → Stable (100)</span>
+            </div>
+            <div id="heatmap-best" style="margin-top:8px;font-size:0.68rem;color:var(--accent)"></div>
+          </div>
+          <div class="note" style="margin-top:10px">Uses the current system type and integrator. Each cell is an independent simulation run scored 0–100.</div>
+        </div>
+
+        <!-- SESSION HISTORY TAB -->
+        <div id="tab-history" class="tab-content" style="padding:12px">
+          <div class="section-title">Session Run History</div>
+          <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+            <span style="font-size:0.62rem;color:var(--muted);flex:1" id="history-count">No runs yet this session.</span>
+            <button class="btn btn-ghost btn-small" style="margin-top:0" onclick="clearHistory()">🗑 Clear</button>
+          </div>
+          <div id="history-chart-wrap" style="display:none;margin-bottom:16px">
+            <div class="section-title" style="font-size:0.62rem">Score Over Time</div>
+            <canvas id="history-chart" height="120" style="width:100%;border-radius:6px"></canvas>
+          </div>
+          <div id="history-list">
+            <div class="empty-state"><div class="icon">📋</div>Each simulation run will be logged here automatically.</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- PRESENTATION SUMMARY -->
+      <div class="panel" style="margin-top:16px">
+        <div class="panel-head"><div class="dot warn"></div>Presentation Summary</div>
+        <div class="panel-body">
+          <div id="presentation-summary" class="summary-card">
+            Run a simulation to generate a presenter-ready summary for your hackathon demo.
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button class="btn btn-ghost btn-small" style="margin-top:0" onclick="copyPresentationSummary()">📋 Copy Summary</button>
+          </div>
+          <div class="mini-grid">
+            <div class="mini-card">
+              <h4>What judges will see</h4>
+              <p>Clear instability detection, explainable AI diagnosis, automatic parameter tuning, and multi-system chaos demos.</p>
+            </div>
+            <div class="mini-card">
+              <h4>Best demo flow</h4>
+              <p>Load Chaotic preset → show instability → run Auto-Tune → compare stable vs unstable → switch to 3D view.</p>
+            </div>
+          </div>
+          <div class="footer-note">
+            PhysiX AI includes <strong>double pendulum</strong>, <strong>orbital mechanics</strong>, <strong>3-body gravity</strong>, <strong>3D Three.js viewer</strong>, <strong>log file upload</strong>, <strong>side-by-side comparison</strong>, and <strong>AI auto-tuning</strong>. Powered by <strong>local AI reasoning</strong> with an optional custom backend hook. No browser API keys required for the demo.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// GLOBALS & STATE
+// ═══════════════════════════════════════════════════════════
+const $ = (id) => document.getElementById(id);
+
+const appState = {
+  simResult: null,
+  analysisResult: null,
+  config: null,
+  chatHistory: [],
+  running: false,
+  lastAssistantText: '',
+  lastMode: 'local',
+  compareA: null,
+  compareB: null,
+  tuning: false,
+  viewer3D: null,
+  viewer3DPlaying: true,
+  viewer3DFrame: 0,
+  uploadedData: null
+};
+
+// ═══════════════════════════════════════════════════════════
+// PHYSICS ENGINE — extended with new systems
+// ═══════════════════════════════════════════════════════════
+const Physics = (() => {
+  function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
+  function norm(arr) { return Math.sqrt(arr.reduce((s, v) => s + v * v, 0)); }
+  function median(arr) {
+    if (!arr.length) return 0;
+    const s = [...arr].sort((a, b) => a - b);
+    const m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : 0.5 * (s[m-1] + s[m]);
+  }
+  function quantile(arr, q) {
+    if (!arr.length) return 0;
+    const s = [...arr].sort((a, b) => a - b);
+    return s[clamp(Math.floor((s.length - 1) * q), 0, s.length - 1)];
+  }
+
+  // ── INTEGRATORS ──
+  function euler(rhs, t, x, dt, p) {
+    const d = rhs(t, x, p);
+    return x.map((xi, i) => xi + dt * d[i]);
+  }
+  function semiEuler(rhs, t, x, dt, p, split) {
+    const d = rhs(t, x, p);
+    const q = x.slice(0, split); const v = x.slice(split); const dv = d.slice(split);
+    const v2 = v.map((vi, i) => vi + dt * dv[i]);
+    const q2 = q.map((qi, i) => qi + dt * v2[i]);
+    return [...q2, ...v2];
+  }
+  function verlet(rhs, t, x, dt, p, split) {
+    const q = x.slice(0, split); const v = x.slice(split);
+    const a0 = rhs(t, x, p).slice(split);
+    const q1 = q.map((qi, i) => qi + dt * v[i] + 0.5 * dt * dt * a0[i]);
+    const a1 = rhs(t + dt, [...q1, ...v], p).slice(split);
+    const v1 = v.map((vi, i) => vi + 0.5 * dt * (a0[i] + a1[i]));
+    return [...q1, ...v1];
+  }
+  function rk4(rhs, t, x, dt, p) {
+    const k1 = rhs(t, x, p);
+    const k2 = rhs(t + 0.5*dt, x.map((xi, i) => xi + 0.5*dt*k1[i]), p);
+    const k3 = rhs(t + 0.5*dt, x.map((xi, i) => xi + 0.5*dt*k2[i]), p);
+    const k4 = rhs(t + dt, x.map((xi, i) => xi + dt*k3[i]), p);
+    return x.map((xi, i) => xi + (dt/6)*(k1[i] + 2*k2[i] + 2*k3[i] + k4[i]));
+  }
+
+  // ── SPRING-MASS ──
+  function springMassRhs(t, x, p) {
+    const N = p.N||4; const k = p.k||20; const damping = p.damping||0.1; const m = p.m||1.0;
+    const pos = x.slice(0,N); const vel = x.slice(N); const force = new Array(N).fill(0);
+    for (let i=0;i<N;i++) {
+      const left = i>0?pos[i-1]:0; const right = i<N-1?pos[i+1]:0;
+      force[i] += -k*(2*pos[i]-left-right) - damping*vel[i];
+    }
+    return [...vel, ...force.map(f => f/m)];
+  }
+  function springMassEnergy(t, x, p) {
+    const N=p.N||4; const k=p.k||20; const m=p.m||1.0;
+    const pos=x.slice(0,N); const vel=x.slice(N);
+    const T = 0.5*m*vel.reduce((s,v)=>s+v*v,0);
+    let V = 0.5*k*pos[0]*pos[0]+0.5*k*pos[N-1]*pos[N-1];
+    for (let i=0;i<N-1;i++) V+=0.5*k*(pos[i+1]-pos[i])**2;
+    return T+V;
+  }
+
+  // ── PENDULUM ──
+  function pendulumRhs(t, x, p) {
+    const [theta, omega] = x; const g=p.g||9.81; const L=p.L||1.0; const damping=p.damping||0.05;
+    return [omega, -(g/L)*Math.sin(theta) - damping*omega];
+  }
+  function pendulumEnergy(t, x, p) {
+    const [theta, omega] = x; const g=p.g||9.81; const L=p.L||1.0; const m=p.m||1.0;
+    return 0.5*m*(L*omega)**2 + m*g*L*(1-Math.cos(theta));
+  }
+
+  // ── DOUBLE PENDULUM (chaotic!) ──
+  function doublePendulumRhs(t, x, p) {
+    const [th1, th2, om1, om2] = x;
+    const g=p.g||9.81; const L=p.L||1.0; const L2=p.L2||1.0;
+    const m1=p.m||1.0; const m2=p.m2||1.0; const damp=p.damping||0.01;
+    const dth = th1 - th2;
+    const denom1 = (2*m1+m2)*L - m2*L*Math.cos(2*dth);
+    const denom2 = (L2/L)*denom1;
+    const a1 = (-g*(2*m1+m2)*Math.sin(th1) - m2*g*Math.sin(th1-2*th2) - 2*Math.sin(dth)*m2*(om2*om2*L2+om1*om1*L*Math.cos(dth))) / denom1 - damp*om1;
+    const a2 = (2*Math.sin(dth)*(om1*om1*L*(m1+m2)+g*(m1+m2)*Math.cos(th1)+om2*om2*L2*m2*Math.cos(dth))) / denom2 - damp*om2;
+    return [om1, om2, a1, a2];
+  }
+  function doublePendulumEnergy(t, x, p) {
+    const [th1, th2, om1, om2] = x;
+    const g=p.g||9.81; const L=p.L||1.0; const L2=p.L2||1.0;
+    const m1=p.m||1.0; const m2=p.m2||1.0;
+    const x1=L*Math.sin(th1); const y1=-L*Math.cos(th1);
+    const x2=x1+L2*Math.sin(th2); const y2=y1-L2*Math.cos(th2);
+    const vx1=L*om1*Math.cos(th1); const vy1=L*om1*Math.sin(th1);
+    const vx2=vx1+L2*om2*Math.cos(th2); const vy2=vy1+L2*om2*Math.sin(th2);
+    const T = 0.5*m1*(vx1*vx1+vy1*vy1) + 0.5*m2*(vx2*vx2+vy2*vy2);
+    const V = m1*g*(y1+L) + m2*g*(y2+L+L2);
+    return T+V;
+  }
+
+  // ── ORBITAL MECHANICS ──
+  function orbitalRhs(t, x, p) {
+    // x = [rx, ry, vx, vy]  two-body
+    const [rx, ry, vx, vy] = x;
+    const G=p.G||1.0; const M=p.M||100;
+    const r3 = Math.pow(rx*rx+ry*ry, 1.5) + 1e-6;
+    return [vx, vy, -G*M*rx/r3, -G*M*ry/r3];
+  }
+  function orbitalEnergy(t, x, p) {
+    const [rx, ry, vx, vy] = x;
+    const G=p.G||1.0; const M=p.M||100; const m=p.m||1.0;
+    const r = Math.sqrt(rx*rx+ry*ry)+1e-9;
+    return 0.5*m*(vx*vx+vy*vy) - G*M*m/r;
+  }
+
+  // ── 3-BODY GRAVITY ──
+  function nBodyRhs(t, x, p) {
+    // x = [x1,y1, x2,y2, x3,y3, vx1,vy1, vx2,vy2, vx3,vy3]
+    const G=p.G||1.0; const ms=[1.0,1.0,1.0];
+    const n=3; const pos=[]; for(let i=0;i<n;i++) pos.push([x[2*i],x[2*i+1]]);
+    const vel=[]; for(let i=0;i<n;i++) vel.push([x[2*n+2*i],x[2*n+2*i+1]]);
+    const acc=Array.from({length:n},()=>[0,0]);
+    for(let i=0;i<n;i++){
+      for(let j=0;j<n;j++){
+        if(i===j) continue;
+        const dx=pos[j][0]-pos[i][0]; const dy=pos[j][1]-pos[i][1];
+        const r3=Math.pow(dx*dx+dy*dy,1.5)+1e-6;
+        acc[i][0]+=G*ms[j]*dx/r3; acc[i][1]+=G*ms[j]*dy/r3;
+      }
+    }
+    const dpos=vel.flat(); const dvel=acc.flat();
+    return [...dpos,...dvel];
+  }
+  function nBodyEnergy(t, x, p) {
+    const G=p.G||1.0; const ms=[1.0,1.0,1.0]; const n=3;
+    const pos=[]; for(let i=0;i<n;i++) pos.push([x[2*i],x[2*i+1]]);
+    const vel=[]; for(let i=0;i<n;i++) vel.push([x[2*n+2*i],x[2*n+2*i+1]]);
+    let T=0,V=0;
+    for(let i=0;i<n;i++) T+=0.5*ms[i]*(vel[i][0]*vel[i][0]+vel[i][1]*vel[i][1]);
+    for(let i=0;i<n;i++) for(let j=i+1;j<n;j++){
+      const dx=pos[j][0]-pos[i][0]; const dy=pos[j][1]-pos[i][1];
+      V-=G*ms[i]*ms[j]/(Math.sqrt(dx*dx+dy*dy)+1e-9);
+    }
+    return T+V;
+  }
+
+  function getSystemFns(system) {
+    switch(system) {
+      case 'spring_mass': return {rhs:springMassRhs, energy:springMassEnergy, split:4, ic:()=>[0.12,0.24,0.36,0.48,0,0,0,0]};
+      case 'pendulum': return {rhs:pendulumRhs, energy:pendulumEnergy, split:1, ic:()=>[Math.PI/4,0]};
+      case 'double_pendulum': return {rhs:doublePendulumRhs, energy:doublePendulumEnergy, split:2, ic:()=>[Math.PI*0.7,Math.PI*0.5,0,0]};
+      case 'orbital': return {rhs:orbitalRhs, energy:orbitalEnergy, split:2, ic:()=>[10,0,0,Math.sqrt(10)]};
+      case 'nbody': return {
+        rhs:nBodyRhs, energy:nBodyEnergy, split:6,
+        ic:()=>{
+          // Figure-8 approximate initial conditions
+          const s=1.2;
+          return [s,-s,s*0.5,s*0.5,-s*1.5,s*0.5,  0.3,0.5,0.3,-1.0,-0.6,0.5];
+        }
+      };
+      default: return {rhs:pendulumRhs, energy:pendulumEnergy, split:1, ic:()=>[Math.PI/4,0]};
+    }
+  }
+
+  function simulate(config) {
+    const {system,integrator,dt,tEnd,params} = config;
+    const sys = getSystemFns(system);
+    const split = sys.split;
+    let x = sys.ic();
+    const rhs=sys.rhs; const energyFn=sys.energy;
+
+    const ts=[],xs=[],energies=[],accels=[],primary=[];
+    let t=0, step=0, abortReason='';
+    const maxSteps = Math.min(25000, Math.ceil(tEnd/dt)+2);
+
+    while(t<=tEnd && step<maxSteps) {
+      ts.push(t); xs.push([...x]);
+      energies.push(energyFn(t,x,params));
+      primary.push(x[0]);
+
+      let next;
+      try {
+        if(integrator==='euler') next=euler(rhs,t,x,dt,params);
+        else if(integrator==='semi_euler') next=semiEuler(rhs,t,x,dt,params,split);
+        else if(integrator==='verlet') next=verlet(rhs,t,x,dt,params,split);
+        else next=rk4(rhs,t,x,dt,params);
+      } catch(err) { abortReason='Integrator exception'; break; }
+
+      if(!next.every(Number.isFinite)) { abortReason='State became NaN/Inf'; break; }
+      const mag=norm(next.slice(0,split));
+      if(mag>1e5) { abortReason='State magnitude exploded'; x=next; break; }
+
+      x=next; t+=dt; step++;
+    }
+
+    for(let i=1;i<xs.length-1;i++) {
+      const prev=xs[i-1],curr=xs[i],nxt=xs[i+1];
+      const a=curr.map((_,j)=>(nxt[j]-2*curr[j]+prev[j])/(dt*dt));
+      accels.push(norm(a.slice(0,split)));
+    }
+
+    return {ts,xs,energies,accels,primary,abortReason,
+      completed: ts.length>0 ? ts[ts.length-1]>=tEnd*0.98 : false,
+      system};
+  }
+
+  function analyze(result, config) {
+    if(!result||result.ts.length<5) return null;
+    const {ts,xs,energies,accels,primary,abortReason}=result;
+    const n=ts.length;
+    const E0=Math.max(1e-9,Math.abs(energies[0]));
+    const energyDrift=Math.abs(energies[energies.length-1]-energies[0])/E0;
+    const explosionRatio=Math.max(...energies.map(e=>Math.abs(e)))/E0;
+    const earlyAbort=!result.completed;
+    const stiffnessIndex = (config.system==='spring_mass'||config.system==='pendulum')
+      ? config.dt*Math.sqrt((config.params.k||1)/Math.max(1e-9,config.params.m||1))
+      : config.dt*Math.sqrt((config.params.g||9.81)/Math.max(1e-9,config.params.L||1));
+    const kWin=Math.max(6,Math.floor(n/10));
+    const sa=Math.sqrt(primary.slice(0,kWin).reduce((s,v)=>s+v*v,0)/kWin);
+    const ea=Math.sqrt(primary.slice(-kWin).reduce((s,v)=>s+v*v,0)/kWin);
+    const oscRatio=(ea+1e-12)/(sa+1e-12);
+    const medAccel=median(accels);
+    const p99Accel=quantile(accels,0.99);
+    const accelRatio=medAccel>0?p99Accel/medAccel:0;
+    const peakPrimary=Math.max(...primary.map(v=>Math.abs(v)));
+
+    const metrics={energyDrift,explosionRatio,oscRatio,accelRatio,stiffnessIndex,peakPrimary,earlyAbort,abortReason:abortReason||''};
+    const events=[];
+
+    if(config.integrator==='euler'&&stiffnessIndex>0.25) events.push({kind:'integrator_risk',t:0,step:0,severity:clamp((stiffnessIndex-0.25)/0.45,0.35,0.95),details:{stiffnessIndex}});
+    if(stiffnessIndex>0.55) events.push({kind:'stiff_system',t:0,step:0,severity:clamp((stiffnessIndex-0.55)/0.55,0.35,1),details:{stiffnessIndex}});
+    if(earlyAbort) events.push({kind:'early_abort',t:ts[n-1],step:n-1,severity:0.92,details:{reason:abortReason||'Diverged before finishing'}});
+    if(explosionRatio>=4) { const idx=energies.findIndex(e=>Math.abs(e)/E0>=4); events.push({kind:'energy_explosion',t:idx>=0?ts[idx]:ts[n-1],step:idx>=0?idx:n-1,severity:clamp((explosionRatio-4)/4,0.55,1),details:{ratio:explosionRatio}}); }
+    if(energyDrift>=0.05) events.push({kind:'energy_drift',t:ts[n-1],step:n-1,severity:clamp(energyDrift/0.25,0.3,1),details:{drift:energyDrift}});
+    if(oscRatio>=1.25) events.push({kind:'osc_growth',t:ts[n-1],step:n-1,severity:clamp((oscRatio-1.25)/1.25,0.3,1),details:{ratio:oscRatio}});
+    if(oscRatio>=1.45&&energyDrift<0.03) events.push({kind:'resonance_growth',t:ts[n-1],step:n-1,severity:clamp((oscRatio-1.45)/0.9,0.35,0.85),details:{ratio:oscRatio}});
+    if(accelRatio>=5.5) events.push({kind:'accel_spike',t:ts[Math.max(0,Math.floor(n*0.8))],step:Math.max(0,Math.floor(n*0.8)),severity:clamp((accelRatio-5.5)/8,0.35,1),details:{ratio:accelRatio}});
+    if(config.params.damping<0.05&&oscRatio>1.1) events.push({kind:'low_damping',t:ts[n-1],step:n-1,severity:clamp((0.05-config.params.damping)/0.05+0.25,0.3,0.8),details:{damping:config.params.damping}});
+    // Chaos-specific
+    if((config.system==='double_pendulum'||config.system==='nbody')&&oscRatio>1.5) events.push({kind:'chaotic_divergence',t:ts[n-1],step:n-1,severity:0.75,details:{note:'Expected chaotic behavior'}});
+
+    const catScores={
+      health: earlyAbort?0:100,
+      energy_explosion: explosionRatio>=4?Math.max(0,100-22*(explosionRatio-4)):100,
+      energy_drift: Math.max(0,100-energyDrift*480),
+      osc_growth: Math.max(0,100-Math.max(0,oscRatio-1)*120),
+      accel_spike: accelRatio?Math.max(0,100-(accelRatio-1)*12):100,
+      stiffness: Math.max(0,100-Math.max(0,stiffnessIndex-0.18)*170)
+    };
+    const weights={health:1.2,energy_explosion:1.15,energy_drift:0.85,osc_growth:0.95,accel_spike:0.7,stiffness:0.8};
+    let num=0,den=0;
+    Object.entries(catScores).forEach(([k,v])=>{const w=weights[k]||0.5;num+=w*v;den+=w;});
+    const overallScore=den>0?num/den:100;
+
+    const rootCauses=computeRootCauses(events,metrics,config);
+    const fixes=recommendFixes(events,metrics,config);
+    return {overallScore,catScores,events,metrics,rootCauses,fixes};
+  }
+
+  function computeRootCauses(events,metrics,config) {
+    const kinds=new Set(events.map(e=>e.kind)); const causes=[];
+    const {integrator,dt}=config;
+    if(kinds.has('early_abort')||kinds.has('energy_explosion')) causes.push({cause:'Timestep too large for current stiffness',confidence:Math.min(0.97,0.48+Math.max(0,metrics.stiffnessIndex-0.22)+(metrics.explosionRatio>4?0.18:0)+(metrics.earlyAbort?0.18:0)),evidence:[`dt = ${dt.toFixed(3)}`,`Stiffness index = ${metrics.stiffnessIndex.toFixed(2)}`,metrics.explosionRatio>1?`Energy peak = ${metrics.explosionRatio.toFixed(2)}× baseline`:null,metrics.abortReason?`Abort: ${metrics.abortReason}`:null].filter(Boolean),suggest:'Cut dt by 40–60%, then rerun. For stiff cases prefer RK4 or Velocity-Verlet.'});
+    if((kinds.has('energy_drift')||kinds.has('integrator_risk'))&&(integrator==='euler'||integrator==='rk4')) causes.push({cause:'Integrator injecting or leaking energy',confidence:Math.min(0.92,0.44+metrics.energyDrift*1.4+(integrator==='euler'?0.14:0.04)),evidence:[`Integrator = ${integrator}`,`Energy drift = ${(metrics.energyDrift*100).toFixed(1)}%`,'Explicit/non-symplectic methods accumulate energy error over time.'],suggest:'Switch to Velocity-Verlet for structure-preserving motion.'});
+    if(kinds.has('osc_growth')||kinds.has('low_damping')) causes.push({cause:'Insufficient damping or numerical pumping',confidence:Math.min(0.88,0.36+Math.max(0,metrics.oscRatio-1)*0.42+(config.params.damping<0.05?0.14:0)),evidence:[`Oscillation envelope grew ${metrics.oscRatio.toFixed(2)}×`,`Damping = ${config.params.damping.toFixed(2)}`,'Amplitude growth = too little damping or timestep-driven energy injection.'],suggest:'Raise damping slightly and verify dt is not exciting the system.'});
+    if(kinds.has('stiff_system')||kinds.has('accel_spike')) causes.push({cause:'Stiff dynamics causing sharp acceleration spikes',confidence:Math.min(0.9,0.38+Math.max(0,metrics.accelRatio-1)*0.06+Math.max(0,metrics.stiffnessIndex-0.25)*0.35),evidence:[`Accel spike = ${metrics.accelRatio?metrics.accelRatio.toFixed(2):'N/A'}×`,`Stiffness index = ${metrics.stiffnessIndex.toFixed(2)}`,'Large acceleration spikes = explicit solver pushed past its comfort zone.'],suggest:'Reduce dt, consider RK4, avoid extremely stiff settings.'});
+    if(kinds.has('chaotic_divergence')) causes.push({cause:'Chaotic sensitivity to initial conditions',confidence:0.85,evidence:['System exhibits true mathematical chaos.','Nearby trajectories diverge exponentially (Lyapunov exponent > 0).',`System: ${config.system}`],suggest:'This is expected behavior, not a numerical error. Use smaller dt to extend predictability window.'});
+    if(kinds.has('resonance_growth')) causes.push({cause:'Resonant amplification',confidence:0.67,evidence:['Amplitude grew while energy drift stayed low.','Timestep may be exciting the system near resonant frequency.'],suggest:'Nudge dt away from the resonant region or add light damping.'});
+    if(!causes.length) causes.push({cause:'No major instability detected',confidence:0.82,evidence:[`Energy drift = ${(metrics.energyDrift*100).toFixed(2)}%`,`Oscillation ratio = ${metrics.oscRatio.toFixed(2)}×`,'Solver remained well-behaved over the simulated time horizon.'],suggest:'Use this configuration as your stable benchmark.'});
+    return causes.sort((a,b)=>b.confidence-a.confidence).slice(0,4);
+  }
+
+  function recommendFixes(events,metrics,config) {
+    const fixes=[]; const kinds=new Set(events.map(e=>e.kind));
+    if(metrics.stiffnessIndex>0.3||kinds.has('energy_explosion')||kinds.has('early_abort')) fixes.push({priority:'High',action:`Reduce dt from ${config.dt.toFixed(3)} to ${(config.dt*0.5).toFixed(3)} or lower.`,why:'Directly addresses stiffness-driven divergence.'});
+    if(config.integrator==='euler') fixes.push({priority:'High',action:'Switch Euler → Velocity-Verlet or RK4.',why:'Euler is the weakest option here and exaggerates energy drift.'});
+    if(config.params.damping<0.08&&metrics.oscRatio>1.1) fixes.push({priority:'Medium',action:`Increase damping to at least ${Math.max(0.12,config.params.damping+0.08).toFixed(2)}.`,why:'Suppresses envelope growth.'});
+    if(kinds.has('accel_spike')) fixes.push({priority:'Medium',action:'Avoid large dt with high stiffness.',why:'Acceleration spikes = explicit solver overdriven.'});
+    if(!fixes.length) fixes.push({priority:'Low',action:'Keep this setup as your stable reference.',why:'Use it as the "healthy" baseline in your presentation.'});
+    return fixes;
+  }
+
+  return {simulate,analyze,getSystemFns};
+})();
+
+// ═══════════════════════════════════════════════════════════
+// UI CONTROLLER
+// ═══════════════════════════════════════════════════════════
+const UI = {
+  init() {
+    this.bindRanges();
+    this.bindChat();
+    this.previewRisk();
+    drawEmptyCharts();
+  },
+  bindRanges() {
+    [['sl-dt','lbl-dt',v=>Number(v).toFixed(3)],
+     ['sl-damp','lbl-damp',v=>Number(v).toFixed(2)],
+     ['sl-k','lbl-k',v=>String(v)],
+     ['sl-dur','lbl-dur',v=>Number(v).toFixed(1)]].forEach(([s,l,f])=>{
+      $(s).addEventListener('input',e=>{$(l).textContent=f(e.target.value);this.previewRisk();});
+    });
+    $('sel-integrator').addEventListener('change',()=>this.previewRisk());
+    $('sel-system').addEventListener('change',()=>this.onSystemChange());
+  },
+  bindChat() {
+    $('chat-input').addEventListener('keydown',e=>{ if(e.key==='Enter') sendChat(); });
+  },
+  onSystemChange() {
+    const sys=$('sel-system').value;
+    // Adjust defaults for each system
+    if(sys==='double_pendulum'||sys==='nbody') {
+      $('sel-integrator').value='rk4';
+      $('sl-dt').value=0.005; $('lbl-dt').textContent='0.005';
+      $('sl-damp').value=0.01; $('lbl-damp').textContent='0.01';
+      $('sl-dur').value=10; $('lbl-dur').textContent='10.0';
+    } else if(sys==='orbital') {
+      $('sel-integrator').value='verlet';
+      $('sl-dt').value=0.01; $('lbl-dt').textContent='0.010';
+      $('sl-damp').value=0; $('lbl-damp').textContent='0.00';
+    }
+    this.previewRisk();
+  },
+  previewRisk() {
+    const cfg=readConfig(); const risk=estimatePreRunRisk(cfg);
+    const banner=$('risk-banner');
+    banner.style.display=risk.show?'block':'none';
+    if(risk.show) banner.innerHTML=risk.message;
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// CONFIG & PRESETS
+// ═══════════════════════════════════════════════════════════
+function readConfig() {
+  return {
+    system: $('sel-system').value,
+    integrator: $('sel-integrator').value,
+    dt: parseFloat($('sl-dt').value),
+    tEnd: parseFloat($('sl-dur').value),
+    params: {N:4, k:parseFloat($('sl-k').value), damping:parseFloat($('sl-damp').value), m:1.0, m2:1.0, g:9.81, L:1.0, L2:1.0, G:1.0, M:100}
+  };
+}
+
+function loadPreset(type) {
+  const set=(id,v,lId,f)=>{ $(id).value=v; if(lId) $(lId).textContent=f?f(v):String(v); };
+  if(type==='unstable'){
+    $('sel-system').value='spring_mass'; $('sel-integrator').value='euler';
+    set('sl-dt',0.12,'lbl-dt',v=>Number(v).toFixed(3));
+    set('sl-damp',0.02,'lbl-damp',v=>Number(v).toFixed(2));
+    set('sl-k',90,'lbl-k'); set('sl-dur',5,'lbl-dur',v=>Number(v).toFixed(1));
+    addChatMsg('assistant',formatAIText('**Unstable preset loaded.** Euler + high stiffness + low damping — this will fail loudly and show off the debugger catching it.'),true);
+  } else if(type==='stiff'){
+    $('sel-system').value='spring_mass'; $('sel-integrator').value='rk4';
+    set('sl-dt',0.03,'lbl-dt',v=>Number(v).toFixed(3));
+    set('sl-damp',0.08,'lbl-damp',v=>Number(v).toFixed(2));
+    set('sl-k',160,'lbl-k'); set('sl-dur',6,'lbl-dur',v=>Number(v).toFixed(1));
+    addChatMsg('assistant',formatAIText('**Stiff system preset loaded.** RK4 handles this, but watch the energy drift with looser settings.'),true);
+  } else if(type==='stable'){
+    $('sel-system').value='pendulum'; $('sel-integrator').value='verlet';
+    set('sl-dt',0.02,'lbl-dt',v=>Number(v).toFixed(3));
+    set('sl-damp',0.45,'lbl-damp',v=>Number(v).toFixed(2));
+    set('sl-k',20,'lbl-k'); set('sl-dur',8,'lbl-dur',v=>Number(v).toFixed(1));
+    addChatMsg('assistant',formatAIText('**Stable baseline preset loaded.** Velocity-Verlet + good damping — this is your "healthy" reference case.'),true);
+  } else if(type==='chaotic'){
+    $('sel-system').value='double_pendulum'; $('sel-integrator').value='rk4';
+    set('sl-dt',0.005,'lbl-dt',v=>Number(v).toFixed(3));
+    set('sl-damp',0.005,'lbl-damp',v=>Number(v).toFixed(3));
+    set('sl-k',20,'lbl-k'); set('sl-dur',10,'lbl-dur',v=>Number(v).toFixed(1));
+    addChatMsg('assistant',formatAIText('**Chaotic double pendulum preset loaded!** This is a famously chaotic system — tiny changes in initial conditions cause wildly different trajectories. Perfect for wowing judges. RK4 with tiny dt extends the predictability window.'),true);
+  }
+  UI.previewRisk();
+}
+
+// ═══════════════════════════════════════════════════════════
+// MAIN RUN
+// ═══════════════════════════════════════════════════════════
+function runSim() {
+  if(appState.running) return;
+  appState.running=true;
+  $('btn-run').disabled=true;
+  $('btn-run-text').innerHTML='<span class="spin"></span> Simulating…';
+
+  setTimeout(()=>{
+    const config=readConfig();
+    const result=Physics.simulate(config);
+    const analysis=Physics.analyze(result,config);
+    appState.config=config; appState.simResult=result; appState.analysisResult=analysis;
+
+    if(!analysis){
+      addChatMsg('assistant','The simulation did not generate enough data to analyze. Try increasing duration or reducing dt.');
+      appState.running=false; $('btn-run').disabled=false; $('btn-run-text').textContent='▶ Run & Analyze';
+      return;
+    }
+
+    setScore(analysis.overallScore);
+    updateMetrics(analysis);
+    renderCategoryBars(analysis.catScores);
+    renderEvents(analysis.events);
+    renderCauses(analysis.rootCauses,analysis.fixes);
+
+    drawChart('chart-energy',result.ts,result.energies,'var(--accent)','Energy');
+    drawChart('chart-accel',result.ts.slice(1,result.accels.length+1),result.accels,analysis.metrics.accelRatio>6?'var(--warn)':'var(--accent2)','|a|');
+    drawChart('chart-pos',result.ts,result.primary,'var(--warn)',config.system==='pendulum'?'Angle':config.system==='double_pendulum'?'θ₁':'Position');
+
+    $('presentation-summary').innerHTML=buildPresenterSummary(config,analysis);
+    update3DScene(result,config);
+
+    // ── New features: log to history, pre-load animation
+    addToHistory(config, analysis);
+    if(result.xs && result.xs.length > 0) Anim.load(result, config);
+
+    // Optional backend AI (falls back to local)
+    addTyping();
+    (async()=>{
+      try {
+        const text=await callOptionalAgentAI('',config,analysis,result);
+        removeTyping();
+        addChatMsg('assistant',formatAIText(text),true);
+        appState.lastMode='claude';
+      } catch(err){
+        removeTyping();
+        addChatMsg('assistant',formatAIText(localDiagnosisText(config,analysis)),true);
+        appState.lastMode='local';
+      } finally {
+        document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+        document.querySelectorAll('.tab')[0].classList.add('active');
+        switchTab('tab-ai',null);
+        appState.running=false; $('btn-run').disabled=false; $('btn-run-text').textContent='▶ Run & Analyze';
+      }
+    })();
+  },50);
+}
+
+// ═══════════════════════════════════════════════════════════
+// OPTIONAL BACKEND AI (safe for demos: local reasoning remains default)
+// ═══════════════════════════════════════════════════════════
+const OPTIONAL_AGENT_ENDPOINT = window.PHYSICS_AGENT_ENDPOINT || '';
+
+async function callOptionalAgentAI(userQuestion, config, analysis, result) {
+  if (!OPTIONAL_AGENT_ENDPOINT) {
+    throw new Error('No backend configured');
+  }
+  const systemNames = {spring_mass:'Spring-Mass Chain',pendulum:'Damped Pendulum',double_pendulum:'Double Pendulum',orbital:'Orbital Mechanics',nbody:'3-Body Gravity',uploaded:'Uploaded Log'};
+  const context = config && analysis ? {
+    system: systemNames[config.system] || config.system,
+    integrator: config.integrator,
+    dt: config.dt,
+    damping: config.params?.damping,
+    stiffness: config.params?.k,
+    duration: config.tEnd,
+    score: analysis.overallScore,
+    metrics: analysis.metrics,
+    events: analysis.events?.map(e => ({kind:e.kind, t:e.t, severity:e.severity})),
+    root_cause: analysis.rootCauses?.[0]?.cause || null,
+    top_fix: analysis.fixes?.[0]?.action || null,
+    summary: result ? buildDetailedSummary(config, analysis, result) : null,
+  } : null;
+
+  const response = await fetch(OPTIONAL_AGENT_ENDPOINT, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question: userQuestion || '', context})
+  });
+  if (!response.ok) throw new Error(`Backend ${response.status}`);
+  const data = await response.json();
+  if (!data || !data.text) throw new Error('Empty backend response');
+  return data.text;
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHAT
+// ═══════════════════════════════════════════════════════════
+function sendChat() {
+  const input=$('chat-input'); const msg=input.value.trim();
+  if(!msg) return; input.value=''; sendQ(msg);
+}
+
+async function sendQ(msg) {
+  $('chat-send').disabled=true;
+  addChatMsg('user',msg); addTyping();
+  try {
+    const text=await callOptionalAgentAI(msg,appState.config,appState.analysisResult,appState.simResult);
+    removeTyping();
+    addChatMsg('assistant',formatAIText(text),true);
+    appState.lastMode='claude';
+  } catch(err){
+    removeTyping();
+    addChatMsg('assistant',formatAIText(appState.analysisResult?answerQuestion(msg):answerGeneralQuestion(msg)),true);
+    appState.lastMode='local';
+  } finally {
+    $('chat-send').disabled=false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// AUTO-TUNE
+// ═══════════════════════════════════════════════════════════
+async function autoTune() {
+  if(appState.tuning) return;
+  appState.tuning=true;
+  $('btn-autotune').disabled=true;
+  $('btn-autotune-text').innerHTML='<span class="spin"></span> Tuning…';
+  $('tuning-progress').style.display='block';
+  $('tuning-results').innerHTML='';
+
+  const baseConfig=readConfig();
+  const combos=[
+    {integrator:'euler',dt:0.005,damping:0.15},
+    {integrator:'euler',dt:0.01,damping:0.1},
+    {integrator:'semi_euler',dt:0.02,damping:0.1},
+    {integrator:'semi_euler',dt:0.01,damping:0.2},
+    {integrator:'verlet',dt:0.02,damping:0.15},
+    {integrator:'verlet',dt:0.01,damping:0.1},
+    {integrator:'verlet',dt:0.005,damping:0.05},
+    {integrator:'rk4',dt:0.02,damping:0.1},
+    {integrator:'rk4',dt:0.01,damping:0.08},
+    {integrator:'rk4',dt:0.005,damping:0.05},
+  ];
+
+  const results=[];
+  for(let i=0;i<combos.length;i++){
+    $('tune-step').textContent=i+1;
+    $('tune-progress-fill').style.width=`${(i+1)*10}%`;
+    await new Promise(r=>setTimeout(r,30));
+
+    const cfg={...baseConfig,...combos[i],params:{...baseConfig.params,damping:combos[i].damping}};
+    const res=Physics.simulate(cfg);
+    const ana=Physics.analyze(res,cfg);
+    const score=ana?ana.overallScore:0;
+    results.push({...combos[i],score,config:cfg,analysis:ana,result:res});
+
+    const item=document.createElement('div');
+    item.className='tuning-run';
+    const scoreColor=score>=80?'var(--accent)':score>=50?'var(--warn)':'var(--danger)';
+    item.innerHTML=`<div class="tr-num">#${i+1}</div><div class="tr-params">${combos[i].integrator} · dt=${combos[i].dt.toFixed(3)} · damp=${combos[i].damping.toFixed(2)}</div><div class="tr-score" style="color:${scoreColor}">${Math.round(score)}</div>`;
+    $('tuning-results').appendChild(item);
+  }
+
+  // Find best
+  results.sort((a,b)=>b.score-a.score);
+  const best=results[0];
+
+  // Apply best config
+  $('sel-integrator').value=best.integrator;
+  $('sl-dt').value=best.dt; $('lbl-dt').textContent=best.dt.toFixed(3);
+  $('sl-damp').value=best.damping; $('lbl-damp').textContent=best.damping.toFixed(2);
+
+  addChatMsg('assistant',formatAIText(`**Auto-Tune complete!** Tested 10 parameter combinations.\n\n**Best config found:** ${best.integrator} · dt=${best.dt.toFixed(3)} · damping=${best.damping.toFixed(2)}\n**Score: ${Math.round(best.score)}/100**\n\nSettings have been applied. Run the simulation to verify.`),true);
+
+  $('tuning-progress').style.display='none';
+  appState.tuning=false;
+  $('btn-autotune').disabled=false;
+  $('btn-autotune-text').textContent='🔬 Auto-Tune (10 runs)';
+  UI.previewRisk();
+}
+
+// ═══════════════════════════════════════════════════════════
+// COMPARISON
+// ═══════════════════════════════════════════════════════════
+function saveCompareSlot(slot) {
+  if(!appState.simResult||!appState.analysisResult) {
+    addChatMsg('assistant','Run a simulation first, then save it to a comparison slot.');
+    return;
+  }
+  appState[`compare${slot}`]={config:{...appState.config},analysis:JSON.parse(JSON.stringify(appState.analysisResult)),result:appState.simResult};
+  addChatMsg('assistant',formatAIText(`**Saved to slot ${slot}.** Score: ${Math.round(appState.analysisResult.overallScore)}/100.`),true);
+}
+
+function runComparison() {
+  const A=appState.compareA; const B=appState.compareB;
+  if(!A||!B) {
+    $('compare-output').innerHTML='<div class="note warn">Save a simulation to both slot A and slot B first, then compare.</div>';
+    return;
+  }
+
+  const sysNames={spring_mass:'Spring-Mass',pendulum:'Pendulum',double_pendulum:'Dbl Pendulum',orbital:'Orbital',nbody:'3-Body'};
+  const verdict=generateComparisonVerdict(A,B);
+
+  $('compare-output').innerHTML=`
+    <div class="compare-grid">
+      <div class="compare-side">
+        <h4>Simulation A</h4>
+        <div class="compare-score ${A.analysis.overallScore>=80?'good':A.analysis.overallScore>=50?'warn':'danger'}" style="color:${A.analysis.overallScore>=80?'var(--accent)':A.analysis.overallScore>=50?'var(--warn)':'var(--danger)'}">${Math.round(A.analysis.overallScore)}</div>
+        <div class="compare-label">${sysNames[A.config.system]||A.config.system} · ${A.config.integrator}</div>
+        ${compareRows(A)}
+      </div>
+      <div class="compare-side">
+        <h4>Simulation B</h4>
+        <div class="compare-score ${B.analysis.overallScore>=80?'good':B.analysis.overallScore>=50?'warn':'danger'}" style="color:${B.analysis.overallScore>=80?'var(--accent)':B.analysis.overallScore>=50?'var(--warn)':'var(--danger)'}">${Math.round(B.analysis.overallScore)}</div>
+        <div class="compare-label">${sysNames[B.config.system]||B.config.system} · ${B.config.integrator}</div>
+        ${compareRows(B)}
+      </div>
+    </div>
+    <div class="compare-verdict">${verdict}</div>`;
+
+  // Try backend explanation of the comparison
+  (async()=>{
+    try {
+      const prompt=`Compare these two physics simulation runs:\n\nRun A: ${A.config.integrator}, dt=${A.config.dt.toFixed(3)}, score=${Math.round(A.analysis.overallScore)}, energy drift=${(A.analysis.metrics.energyDrift*100).toFixed(1)}%\nRun B: ${B.config.integrator}, dt=${B.config.dt.toFixed(3)}, score=${Math.round(B.analysis.overallScore)}, energy drift=${(B.analysis.metrics.energyDrift*100).toFixed(1)}%\n\nExplain the key difference, which is better and why, and what this demonstrates about numerical methods. Keep it under 150 words, suitable for a hackathon judge.`;
+      const text=await callOptionalAgentAI(prompt,null,null,null);
+      addChatMsg('assistant',formatAIText('**AI Comparison Analysis:**\n\n'+text),true);
+    } catch(err){
+      addChatMsg('assistant',formatAIText(verdict),true);
+    }
+  })();
+}
+
+function compareRows(slot) {
+  const m=slot.analysis.metrics; const c=slot.config;
+  return `
+    <div class="compare-row"><span class="k">dt</span><span class="v">${c.dt.toFixed(4)}</span></div>
+    <div class="compare-row"><span class="k">damping</span><span class="v">${c.params.damping.toFixed(3)}</span></div>
+    <div class="compare-row"><span class="k">energy drift</span><span class="v" style="color:${m.energyDrift>0.1?'var(--danger)':m.energyDrift>0.03?'var(--warn)':'var(--accent)'}">${(m.energyDrift*100).toFixed(1)}%</span></div>
+    <div class="compare-row"><span class="k">osc growth</span><span class="v">${m.oscRatio.toFixed(2)}×</span></div>
+    <div class="compare-row"><span class="k">stiffness idx</span><span class="v">${m.stiffnessIndex.toFixed(3)}</span></div>
+    <div class="compare-row"><span class="k">events</span><span class="v">${slot.analysis.events.length}</span></div>
+    <div class="compare-row"><span class="k">completed</span><span class="v" style="color:${slot.result.completed?'var(--accent)':'var(--danger)'}">${slot.result.completed?'Yes':'No'}</span></div>`;
+}
+
+function generateComparisonVerdict(A,B) {
+  const winner=A.analysis.overallScore>=B.analysis.overallScore?'A':'B';
+  const loser=winner==='A'?'B':'A';
+  const wScore=Math[winner==='A'?'round':'round'](appState.compareA.analysis.overallScore);
+  const lScore=Math.round(winner==='A'?appState.compareB.analysis.overallScore:appState.compareA.analysis.overallScore);
+  const diff=Math.abs(A.analysis.overallScore-B.analysis.overallScore);
+  return `<strong>Simulation ${winner} wins</strong> with a score of ${winner==='A'?Math.round(A.analysis.overallScore):Math.round(B.analysis.overallScore)}/100 vs ${winner==='A'?Math.round(B.analysis.overallScore):Math.round(A.analysis.overallScore)}/100 (Δ ${diff.toFixed(1)} points). The key difference is the <strong>integrator</strong> (${A.config.integrator} vs ${B.config.integrator}) and <strong>dt</strong> (${A.config.dt.toFixed(3)} vs ${B.config.dt.toFixed(3)}). This demonstrates why numerical method selection fundamentally changes simulation reliability.`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// FILE UPLOAD
+// ═══════════════════════════════════════════════════════════
+function handleDragOver(e) {
+  e.preventDefault(); e.stopPropagation();
+  $('upload-zone').classList.add('drag-over');
+}
+function handleDrop(e) {
+  e.preventDefault(); e.stopPropagation();
+  $('upload-zone').classList.remove('drag-over');
+  const file=e.dataTransfer.files[0];
+  if(file) processUploadedFile(file);
+}
+function handleFileUpload(e) {
+  const file=e.target.files[0];
+  if(file) processUploadedFile(file);
+}
+
+function processUploadedFile(file) {
+  const reader=new FileReader();
+  reader.onload=(e)=>{
+    const content=e.target.result;
+    try {
+      let data;
+      if(file.name.endsWith('.json')) {
+        data=JSON.parse(content);
+        analyzeUploadedData(data,file.name,'json');
+      } else if(file.name.endsWith('.csv')) {
+        data=parseCSV(content);
+        analyzeUploadedData(data,file.name,'csv');
+      } else {
+        showUploadError('Unsupported file type. Use CSV or JSON.');
+      }
+    } catch(err) {
+      showUploadError(`Parse error: ${err.message}`);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function parseCSV(text) {
+  const lines=text.trim().split(/\r?\n/).filter(Boolean);
+  const headers=lines[0].split(',').map(h=>h.trim());
+  const lower=headers.map(h=>h.toLowerCase());
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    const vals=lines[i].split(',').map(v=>parseFloat(v.trim()));
+    if(vals.length !== headers.length || vals.some(Number.isNaN)) continue;
+    const row={}; headers.forEach((h,j)=>row[h]=vals[j]);
+    rows.push(row);
+  }
+  const findHeader = (patterns, fallbackIndex=0) => {
+    const idx = lower.findIndex(h => patterns.some(rx => rx.test(h)));
+    return headers[idx >= 0 ? idx : Math.min(fallbackIndex, headers.length - 1)];
+  };
+  const tCol=findHeader([/^t$/, /^time$/, /timestamp/, /^sec/, /^seconds$/],0);
+  const eCol=(function(){ const idx=lower.findIndex(h=>[/^energy$/, /^e$/, /total.?energy/, /hamiltonian/].some(rx=>rx.test(h))); return idx>=0?headers[idx]:null; })();
+  const xCol=findHeader([/^x$/, /^pos/, /^position$/, /^angle$/, /^theta/, /^primary$/, /displacement/], Math.min(1, headers.length - 1));
+  const vCol=(function(){ const idx=lower.findIndex(h=>[/^v$/, /^vel/, /^velocity$/, /^omega$/, /^speed$/].some(rx=>rx.test(h))); return idx>=0?headers[idx]:null; })();
+  return {
+    ts:rows.map(r=>r[tCol]||0),
+    energies:eCol?rows.map(r=>r[eCol]):null,
+    primary:xCol?rows.map(r=>r[xCol]):rows.map(r=>r[headers[Math.min(1, headers.length - 1)]]||0),
+    velocity:vCol?rows.map(r=>r[vCol]):null,
+    headers,rowCount:rows.length
+  };
+}
+
+async function analyzeUploadedData(data,filename,format) {
+  appState.uploadedData=data;
+  const ts=data.ts||data.time||[];
+  const energies=data.energies||data.energy||null;
+  const primary=data.primary||data.x||data.position||data.angle||[];
+
+  if(ts.length<5){
+    showUploadError('Not enough time points found. Need at least 5 rows with a time column.');
+    return;
+  }
+
+  // Synthetic analysis from uploaded data
+  const mockResult={ts,energies:energies||primary.map((_,i)=>i),primary,accels:[],xs:[],abortReason:'',completed:true,system:'uploaded'};
+  const mockConfig={system:'uploaded',integrator:'unknown',dt:ts.length>1?ts[1]-ts[0]:0.01,tEnd:ts[ts.length-1],params:{k:20,damping:0.1,N:4,m:1,g:9.81,L:1,G:1,M:100}};
+
+  // Build accels from finite differences
+  for(let i=1;i<primary.length-1;i++){
+    const dt2=(ts[i+1]-ts[i-1])||0.02;
+    mockResult.accels.push(Math.abs((primary[i+1]-2*primary[i]+primary[i-1])/(dt2*dt2/4)));
+  }
+
+  const analysis=Physics.analyze(mockResult,mockConfig);
+  appState.config=mockConfig; appState.simResult=mockResult; appState.analysisResult=analysis;
+
+  // Show upload result
+  $('upload-result').innerHTML=`
+    <div class="upload-result">
+      <div class="ur-name">📁 ${filename}</div>
+      <div class="ur-stats">
+        <div class="log-field"><span class="lf-key">Format: </span><span class="lf-val">${format.toUpperCase()}</span></div>
+        <div class="log-field"><span class="lf-key">Data points: </span><span class="lf-val">${ts.length}</span></div>
+        <div class="log-field"><span class="lf-key">Time range: </span><span class="lf-val">${ts[0]?.toFixed(3)} → ${ts[ts.length-1]?.toFixed(3)}s</span></div>
+        <div class="log-field"><span class="lf-key">Columns: </span><span class="lf-val">${data.headers?data.headers.join(', '):'ts, energies, primary'}</span></div>
+        ${analysis?`<div class="log-field"><span class="lf-key">Stability score: </span><span class="lf-val" style="color:${analysis.overallScore>=80?'var(--accent)':analysis.overallScore>=50?'var(--warn)':'var(--danger)'}">${Math.round(analysis.overallScore)}/100</span></div>`:''}
+      </div>
+    </div>`;
+
+  if(analysis){
+    setScore(analysis.overallScore);
+    updateMetrics(analysis);
+    renderCategoryBars(analysis.catScores);
+    renderEvents(analysis.events);
+    renderCauses(analysis.rootCauses,analysis.fixes);
+    drawChart('chart-energy',ts,energies||primary,'var(--accent)','Energy');
+    drawChart('chart-pos',ts,primary,'var(--warn)','Position/Angle');
+  }
+
+  // Try backend analysis of uploaded data
+  addTyping();
+  switchTab('tab-ai',null);
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab')[0].classList.add('active');
+  try {
+    const prompt=`An external simulation log was uploaded: ${filename} (${format.toUpperCase()}, ${ts.length} data points, time range ${ts[0]?.toFixed(2)}s to ${ts[ts.length-1]?.toFixed(2)}s). ${analysis?`Stability score: ${Math.round(analysis.overallScore)}/100. Energy drift: ${(analysis.metrics.energyDrift*100).toFixed(1)}%. Primary oscillation growth: ${analysis.metrics.oscRatio.toFixed(2)}x.`:''}\n\nAnalyze this external simulation log. What can we tell about it? What are likely issues? What system might this be? Give an expert diagnosis as if you're reviewing an engineering simulation.`;
+    const text=await callOptionalAgentAI(prompt,null,null,null);
+    removeTyping();
+    addChatMsg('assistant',formatAIText(`**External Log Analysis — ${filename}**\n\n${text}`),true);
+  } catch(err){
+    removeTyping();
+    addChatMsg('assistant',formatAIText(analysis?`**Uploaded log analyzed.** Stability score: **${Math.round(analysis.overallScore)}/100**.\n\n${localDiagnosisText(mockConfig,analysis)}`:'Log loaded but could not be analyzed.'),true);
+  }
+}
+
+function showUploadError(msg){
+  $('upload-result').innerHTML=`<div class="note" style="background:rgba(255,64,96,0.07);border-color:rgba(255,64,96,0.2);color:#ffaabb;margin-top:10px">⚠️ ${msg}</div>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// 3D VIEWER (Three.js)
+// ═══════════════════════════════════════════════════════════
+let scene3D=null,camera3D=null,renderer3D=null,objects3D=[],animFrame3D=null,isDragging3D=false,prevMouse3D={x:0,y:0},spherical3D={theta:0.5,phi:1.0,radius:8};
+
+function init3D() {
+  if(!appState.simResult) { $('viewer-sys-label').textContent='Run a simulation first'; return; }
+  if(renderer3D) { update3DScene(appState.simResult,appState.config); return; }
+
+  const container=$('viewer-3d');
+  const W=container.clientWidth, H=container.clientHeight;
+
+  scene3D=new THREE.Scene();
+  camera3D=new THREE.PerspectiveCamera(60,W/H,0.01,1000);
+  camera3D.position.set(0,4,8);
+
+  renderer3D=new THREE.WebGLRenderer({antialias:true,alpha:true});
+  renderer3D.setSize(W,H);
+  renderer3D.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer3D.setClearColor(0x000000,0);
+  container.appendChild(renderer3D.domElement);
+
+  // Lights
+  const ambient=new THREE.AmbientLight(0x334466,0.8);
+  scene3D.add(ambient);
+  const dirLight=new THREE.DirectionalLight(0x00ffc6,1.2);
+  dirLight.position.set(5,10,5);
+  scene3D.add(dirLight);
+  const pointLight=new THREE.PointLight(0x5b8fff,1.0,20);
+  pointLight.position.set(-3,3,3);
+  scene3D.add(pointLight);
+
+  // Grid
+  const gridHelper=new THREE.GridHelper(12,12,0x1e2438,0x1e2438);
+  scene3D.add(gridHelper);
+
+  // Mouse controls
+  const canvas=renderer3D.domElement;
+  canvas.addEventListener('mousedown',e=>{ isDragging3D=true; prevMouse3D={x:e.clientX,y:e.clientY}; });
+  canvas.addEventListener('mousemove',e=>{
+    if(!isDragging3D) return;
+    const dx=e.clientX-prevMouse3D.x; const dy=e.clientY-prevMouse3D.y;
+    spherical3D.theta-=dx*0.01; spherical3D.phi=Math.max(0.1,Math.min(Math.PI-0.1,spherical3D.phi+dy*0.01));
+    prevMouse3D={x:e.clientX,y:e.clientY};
+    updateCamera3D();
+  });
+  window.addEventListener('mouseup',()=>isDragging3D=false);
+  canvas.addEventListener('wheel',e=>{
+    spherical3D.radius=Math.max(2,Math.min(20,spherical3D.radius+e.deltaY*0.01));
+    updateCamera3D();
+  });
+
+  update3DScene(appState.simResult,appState.config);
+  animate3D();
+}
+
+function updateCamera3D() {
+  if(!camera3D) return;
+  camera3D.position.x=spherical3D.radius*Math.sin(spherical3D.phi)*Math.sin(spherical3D.theta);
+  camera3D.position.y=spherical3D.radius*Math.cos(spherical3D.phi);
+  camera3D.position.z=spherical3D.radius*Math.sin(spherical3D.phi)*Math.cos(spherical3D.theta);
+  camera3D.lookAt(0,0,0);
+}
+
+function update3DScene(result,config) {
+  if(!scene3D) return;
+  // Remove old objects
+  objects3D.forEach(o=>scene3D.remove(o)); objects3D=[];
+  appState.viewer3DFrame=0;
+  $('viewer-sys-label').textContent=config.system.replace('_',' ').toUpperCase();
+
+  if(config.system==='spring_mass') build3DSpringMass(result,config);
+  else if(config.system==='pendulum') build3DPendulum(result,config);
+  else if(config.system==='double_pendulum') build3DDoublePendulum(result,config);
+  else if(config.system==='orbital') build3DOrbital(result,config);
+  else if(config.system==='nbody') build3DNBody(result,config);
+}
+
+function build3DSpringMass(result,config) {
+  const N=config.params.N||4;
+  const colors=[0x00ffc6,0x5b8fff,0xffb830,0xff6b6b];
+  for(let i=0;i<N;i++){
+    const geo=new THREE.SphereGeometry(0.18,16,16);
+    const mat=new THREE.MeshPhongMaterial({color:colors[i%colors.length],emissive:colors[i%colors.length],emissiveIntensity:0.3});
+    const mesh=new THREE.Mesh(geo,mat);
+    mesh.position.set(i*1.5-N*0.75+0.75,0,0);
+    scene3D.add(mesh); objects3D.push(mesh);
+    mesh.userData={type:'spring_node',idx:i,result,N};
+  }
+  // Spring lines
+  for(let i=0;i<N-1;i++){
+    const mat=new THREE.LineBasicMaterial({color:0x2a3058});
+    const geo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-1,0,0),new THREE.Vector3(1,0,0)]);
+    const line=new THREE.Line(geo,mat);
+    scene3D.add(line); objects3D.push(line);
+    line.userData={type:'spring_line',idx:i};
+  }
+}
+
+function build3DPendulum(result,config) {
+  const L=config.params.L||1;
+  // Pivot
+  const pivotGeo=new THREE.SphereGeometry(0.12,12,12);
+  const pivotMat=new THREE.MeshPhongMaterial({color:0x5b8fff});
+  const pivot=new THREE.Mesh(pivotGeo,pivotMat);
+  pivot.position.set(0,2,0); scene3D.add(pivot); objects3D.push(pivot);
+  // Bob
+  const bobGeo=new THREE.SphereGeometry(0.3,16,16);
+  const bobMat=new THREE.MeshPhongMaterial({color:0x00ffc6,emissive:0x00ffc6,emissiveIntensity:0.4});
+  const bob=new THREE.Mesh(bobGeo,bobMat);
+  scene3D.add(bob); objects3D.push(bob);
+  bob.userData={type:'pendulum_bob',result,L};
+  // Rod
+  const rodMat=new THREE.LineBasicMaterial({color:0x404870});
+  const rodGeo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(0,-1,0)]);
+  const rod=new THREE.Line(rodGeo,rodMat);
+  scene3D.add(rod); objects3D.push(rod);
+  rod.userData={type:'pendulum_rod',result,L};
+  // Trail
+  const trailMat=new THREE.LineBasicMaterial({color:0x00ffc6,transparent:true,opacity:0.3});
+  const trailGeo=new THREE.BufferGeometry();
+  const maxTrail=80;
+  const positions=new Float32Array(maxTrail*3).fill(0);
+  trailGeo.setAttribute('position',new THREE.BufferAttribute(positions,3));
+  trailGeo.setDrawRange(0,0);
+  const trail=new THREE.Line(trailGeo,trailMat);
+  scene3D.add(trail); objects3D.push(trail);
+  trail.userData={type:'trail',maxLen:maxTrail,count:0};
+}
+
+function build3DDoublePendulum(result,config) {
+  const L=config.params.L||1; const L2=config.params.L2||1;
+  [0,1].forEach(i=>{
+    const bobGeo=new THREE.SphereGeometry(0.25,16,16);
+    const bobMat=new THREE.MeshPhongMaterial({color:i===0?0x00ffc6:0xff6b6b,emissive:i===0?0x00ffc6:0xff6b6b,emissiveIntensity:0.35});
+    const bob=new THREE.Mesh(bobGeo,bobMat);
+    scene3D.add(bob); objects3D.push(bob);
+    bob.userData={type:'dp_bob',idx:i,result,L,L2};
+  });
+  // Two rods
+  for(let i=0;i<2;i++){
+    const rodMat=new THREE.LineBasicMaterial({color:i===0?0x404870:0x503040});
+    const rodGeo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(0,-1,0)]);
+    const rod=new THREE.Line(rodGeo,rodMat);
+    scene3D.add(rod); objects3D.push(rod);
+    rod.userData={type:'dp_rod',idx:i};
+  }
+  // Chaos trail (longer)
+  const trailMat=new THREE.LineBasicMaterial({color:0xff6b6b,transparent:true,opacity:0.5});
+  const maxTrail=200;
+  const positions=new Float32Array(maxTrail*3).fill(0);
+  const trailGeo=new THREE.BufferGeometry();
+  trailGeo.setAttribute('position',new THREE.BufferAttribute(positions,3));
+  trailGeo.setDrawRange(0,0);
+  const trail=new THREE.Line(trailGeo,trailMat);
+  scene3D.add(trail); objects3D.push(trail);
+  trail.userData={type:'chaos_trail',maxLen:maxTrail,count:0};
+}
+
+function build3DOrbital(result,config) {
+  // Star
+  const starGeo=new THREE.SphereGeometry(0.4,16,16);
+  const starMat=new THREE.MeshPhongMaterial({color:0xffb830,emissive:0xffb830,emissiveIntensity:0.8});
+  const star=new THREE.Mesh(starGeo,starMat);
+  star.position.set(0,0,0); scene3D.add(star); objects3D.push(star);
+  // Planet
+  const planetGeo=new THREE.SphereGeometry(0.2,12,12);
+  const planetMat=new THREE.MeshPhongMaterial({color:0x00ffc6,emissive:0x00ffc6,emissiveIntensity:0.3});
+  const planet=new THREE.Mesh(planetGeo,planetMat);
+  scene3D.add(planet); objects3D.push(planet);
+  planet.userData={type:'planet',result};
+  // Orbit trail
+  const trailMat=new THREE.LineBasicMaterial({color:0x00ffc6,transparent:true,opacity:0.4});
+  const maxTrail=300;
+  const trailGeo=new THREE.BufferGeometry();
+  trailGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(maxTrail*3).fill(0),3));
+  trailGeo.setDrawRange(0,0);
+  const trail=new THREE.Line(trailGeo,trailMat);
+  scene3D.add(trail); objects3D.push(trail);
+  trail.userData={type:'orbit_trail',maxLen:maxTrail,count:0};
+}
+
+function build3DNBody(result,config) {
+  const colors=[0x00ffc6,0x5b8fff,0xff6b6b];
+  for(let i=0;i<3;i++){
+    const geo=new THREE.SphereGeometry(0.22,12,12);
+    const mat=new THREE.MeshPhongMaterial({color:colors[i],emissive:colors[i],emissiveIntensity:0.35});
+    const body=new THREE.Mesh(geo,mat);
+    scene3D.add(body); objects3D.push(body);
+    body.userData={type:'nbody',idx:i,result};
+    const trailMat=new THREE.LineBasicMaterial({color:colors[i],transparent:true,opacity:0.35});
+    const maxTrail=150;
+    const trailGeo=new THREE.BufferGeometry();
+    trailGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(maxTrail*3).fill(0),3));
+    trailGeo.setDrawRange(0,0);
+    const trail=new THREE.Line(trailGeo,trailMat);
+    scene3D.add(trail); objects3D.push(trail);
+    trail.userData={type:'nbody_trail',idx:i,maxLen:maxTrail,count:0};
+  }
+}
+
+function animate3D() {
+  animFrame3D=requestAnimationFrame(animate3D);
+  if(!renderer3D||!appState.viewer3DPlaying) return;
+  if(!appState.simResult) { renderer3D.render(scene3D,camera3D); return; }
+
+  const result=appState.simResult; const xs=result.xs;
+  if(!xs||!xs.length) { renderer3D.render(scene3D,camera3D); return; }
+
+  const f=appState.viewer3DFrame%xs.length;
+  const x=xs[f];
+  const cfg=appState.config;
+  const speed=Math.max(1,Math.floor(xs.length/400));
+
+  // Update objects
+  objects3D.forEach(obj=>{
+    const d=obj.userData;
+    if(!d||!d.type) return;
+
+    if(d.type==='spring_node'&&x){
+      const N=d.N; const pos=x.slice(0,N);
+      const px=(d.idx-(N-1)/2)*1.5+(pos[d.idx]||0)*1.5;
+      obj.position.set(px,0,0);
+      // Color by energy
+      const e=result.energies[f]||0; const e0=Math.max(1e-9,Math.abs(result.energies[0]||1));
+      const ratio=Math.abs(e)/e0;
+      const col=ratio>2?new THREE.Color(0xff4060):ratio>1.2?new THREE.Color(0xffb830):new THREE.Color(0x00ffc6);
+      obj.material.color.set(col); obj.material.emissive.set(col);
+    }
+    if(d.type==='pendulum_bob'&&x){
+      const theta=x[0]||0; const L=d.L;
+      obj.position.set(Math.sin(theta)*L*2,2-Math.cos(theta)*L*2,0);
+    }
+    if(d.type==='pendulum_rod'&&x){
+      const theta=x[0]||0; const L=d.L;
+      const px=Math.sin(theta)*L*2; const py=2-Math.cos(theta)*L*2;
+      const pts=[new THREE.Vector3(0,2,0),new THREE.Vector3(px,py,0)];
+      obj.geometry.setFromPoints(pts); obj.geometry.needsUpdate=true;
+    }
+    if(d.type==='trail'&&x){
+      const theta=x[0]||0; const L=(cfg&&cfg.params.L)||1;
+      const px=Math.sin(theta)*L*2; const py=2-Math.cos(theta)*L*2;
+      updateTrail(obj,px,py,0);
+    }
+    if(d.type==='dp_bob'&&x){
+      const [th1,th2]=x; const L=(cfg&&cfg.params.L)||1; const L2=(cfg&&cfg.params.L2)||1;
+      if(d.idx===0){ obj.position.set(Math.sin(th1)*L*2,2-Math.cos(th1)*L*2,0); }
+      else { const x1=Math.sin(th1)*L*2; const y1=2-Math.cos(th1)*L*2; obj.position.set(x1+Math.sin(th2)*L2*2,y1-Math.cos(th2)*L2*2,0); }
+    }
+    if(d.type==='dp_rod'&&x){
+      const [th1,th2]=x; const L=(cfg&&cfg.params.L)||1; const L2=(cfg&&cfg.params.L2)||1;
+      let pts;
+      if(d.idx===0){ pts=[new THREE.Vector3(0,2,0),new THREE.Vector3(Math.sin(th1)*L*2,2-Math.cos(th1)*L*2,0)]; }
+      else { const x1=Math.sin(th1)*L*2; const y1=2-Math.cos(th1)*L*2; pts=[new THREE.Vector3(x1,y1,0),new THREE.Vector3(x1+Math.sin(th2)*L2*2,y1-Math.cos(th2)*L2*2,0)]; }
+      obj.geometry.setFromPoints(pts); obj.geometry.needsUpdate=true;
+    }
+    if(d.type==='chaos_trail'&&x){
+      const [th1,th2]=x; const L=(cfg&&cfg.params.L)||1; const L2=(cfg&&cfg.params.L2)||1;
+      const x1=Math.sin(th1)*L*2; const y1=2-Math.cos(th1)*L*2;
+      const x2=x1+Math.sin(th2)*L2*2; const y2=y1-Math.cos(th2)*L2*2;
+      updateTrail(obj,x2,y2,0);
+    }
+    if(d.type==='planet'&&x){
+      const scale=0.15; obj.position.set((x[0]||0)*scale,0,(x[1]||0)*scale);
+    }
+    if(d.type==='orbit_trail'&&x){
+      const scale=0.15; updateTrail(obj,(x[0]||0)*scale,0,(x[1]||0)*scale);
+    }
+    if(d.type==='nbody'&&x){
+      // x = [x1,y1,x2,y2,x3,y3, vx1,vy1,vx2,vy2,vx3,vy3]
+      const scale=1.5; const i=d.idx;
+      obj.position.set((x[2*i]||0)*scale,0,(x[2*i+1]||0)*scale);
+    }
+    if(d.type==='nbody_trail'&&x){
+      const scale=1.5; const i=d.idx;
+      updateTrail(obj,(x[2*i]||0)*scale,0,(x[2*i+1]||0)*scale);
+    }
+  });
+
+  appState.viewer3DFrame=(f+speed)%xs.length;
+  renderer3D.render(scene3D,camera3D);
+}
+
+function updateTrail(lineObj,x,y,z) {
+  const d=lineObj.userData;
+  const pos=lineObj.geometry.attributes.position;
+  const arr=pos.array;
+  const n=Math.min(d.count+1,d.maxLen);
+  // Shift
+  for(let i=n-1;i>0;i--){ arr[i*3]=arr[(i-1)*3]; arr[i*3+1]=arr[(i-1)*3+1]; arr[i*3+2]=arr[(i-1)*3+2]; }
+  arr[0]=x; arr[1]=y; arr[2]=z;
+  pos.needsUpdate=true;
+  lineObj.geometry.setDrawRange(0,n);
+  d.count=n;
+}
+
+function toggle3DAnimation() { appState.viewer3DPlaying=!appState.viewer3DPlaying; }
+function reset3DCamera() { spherical3D={theta:0.5,phi:1.0,radius:8}; updateCamera3D(); }
+
+// ═══════════════════════════════════════════════════════════
+// SCORE & UI UPDATES
+// ═══════════════════════════════════════════════════════════
+function setScore(score) {
+  const circ=345.4;
+  $('ring-fill').style.strokeDashoffset=circ*(1-score/100);
+  $('score-num').textContent=Math.round(score);
+  if(score>=80){ $('ring-fill').style.stroke='var(--accent)'; $('score-num').className='score-num good'; $('score-title').textContent='Stable'; $('score-subtext').textContent='Strong healthy baseline. Use as the "good" side of your demo comparison.'; }
+  else if(score>=50){ $('ring-fill').style.stroke='var(--warn)'; $('score-num').className='score-num warn'; $('score-title').textContent='Marginal'; $('score-subtext').textContent='Running but error is accumulating. Great for explaining why integrator choice matters.'; }
+  else { $('ring-fill').style.stroke='var(--danger)'; $('score-num').className='score-num danger'; $('score-title').textContent='Unstable'; $('score-subtext').textContent='Clear signs of divergence. Exactly what makes the debugger look useful.'; }
+}
+
+function updateMetrics(analysis) {
+  $('metrics-grid').style.display='grid';
+  $('m-edrift').textContent=`${(analysis.metrics.energyDrift*100).toFixed(1)}%`;
+  $('m-edrift').className='m-val '+(analysis.metrics.energyDrift>0.1?'danger':analysis.metrics.energyDrift>0.03?'warn':'good');
+  $('m-events').textContent=analysis.events.length;
+  $('m-events').className='m-val '+(analysis.events.length>3?'danger':analysis.events.length>0?'warn':'good');
+  $('m-accel').textContent=analysis.metrics.accelRatio?`${analysis.metrics.accelRatio.toFixed(1)}×`:'—';
+  $('m-accel').className='m-val '+(analysis.metrics.accelRatio>8?'danger':analysis.metrics.accelRatio>4?'warn':'good');
+  $('m-stiff').textContent=analysis.metrics.stiffnessIndex.toFixed(2);
+  $('m-stiff').className='m-val '+(analysis.metrics.stiffnessIndex>0.5?'danger':analysis.metrics.stiffnessIndex>0.25?'warn':'good');
+}
+
+function renderCategoryBars(catScores) {
+  const labels={health:'Completion',energy_explosion:'Explosion',energy_drift:'Energy Drift',osc_growth:'Osc. Growth',accel_spike:'Accel Spike',stiffness:'Step/Stiffness'};
+  $('category-bars').innerHTML=Object.entries(catScores).map(([k,s])=>{
+    const color=s>=80?'var(--accent)':s>=50?'var(--warn)':'var(--danger)';
+    return `<div class="cat-row"><div class="cat-name">${labels[k]||k}</div><div class="cat-bar"><div class="cat-fill" style="width:${Math.max(0,Math.min(100,s))}%;background:${color}"></div></div><div class="cat-val">${Math.round(s)}</div></div>`;
+  }).join('');
+  $('category-bars').style.display='block';
+}
+
+function renderEvents(events) {
+  if(!events||!events.length){ $('events-content').innerHTML='<div class="empty-state"><div class="icon">✅</div>No failure events detected. Simulation remained numerically well-behaved.</div>'; return; }
+  const labels={integrator_risk:'Integrator Risk',stiff_system:'Stiff System',early_abort:'Early Abort',energy_explosion:'Energy Explosion',energy_drift:'Energy Drift',osc_growth:'Oscillation Growth',resonance_growth:'Resonance Growth',accel_spike:'Acceleration Spike',low_damping:'Low Damping',chaotic_divergence:'Chaotic Divergence'};
+  $('events-content').innerHTML=`<div class="event-list">${events.map(e=>{
+    const sc=e.severity>=0.75?'sev-high':e.severity>=0.45?'sev-med':'sev-low';
+    const det=e.details?Object.entries(e.details).map(([k,v])=>`${k}: ${typeof v==='number'?v.toFixed(3):v}`).join(' · '):'';
+    return `<div class="event-item ${sc}"><div class="event-kind">${labels[e.kind]||e.kind}</div><div class="event-meta">t=${Number(e.t).toFixed(3)}s · step ${e.step} · severity ${(e.severity*100).toFixed(0)}%${det?' · '+det:''}</div></div>`;
+  }).join('')}</div>`;
+}
+
+function renderCauses(causes,fixes) {
+  if(!causes||!causes.length){ $('causes-content').innerHTML='<div class="empty-state"><div class="icon">🔍</div>No major root cause identified yet.</div>'; return; }
+  const causeHTML=causes.map((c,i)=>{
+    const conf=Math.max(0,Math.min(100,c.confidence*100));
+    const color=conf>=80?'var(--danger)':conf>=55?'var(--warn)':'var(--accent2)';
+    return `<div class="cause-card"><div class="cause-name">${i+1}. ${c.cause}</div><div style="font-size:0.6rem;color:${color};margin-bottom:5px">Confidence: ${conf.toFixed(0)}%</div><div class="conf-bar"><div class="conf-fill" style="width:${conf}%;background:${color}"></div></div><div class="evidence">${(c.evidence||[]).map(x=>`→ ${x}`).join('<br>')}</div><div style="margin-top:7px;font-size:0.64rem;color:var(--accent)">💡 ${c.suggest}</div></div>`;
+  }).join('');
+  const fixHTML=fixes&&fixes.length?`<div class="summary-card" style="margin-top:10px"><strong>Fastest repair path</strong><br><br>${fixes.map(f=>`<div class="fix-item"><span class="fix-icon">${f.priority}</span><span><strong>${f.action}</strong><br><span style="color:var(--muted)">${f.why}</span></span></div>`).join('')}</div>`:'';
+  $('causes-content').innerHTML=causeHTML+fixHTML;
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHARTS
+// ═══════════════════════════════════════════════════════════
+function drawChart(canvasId, ts, ys, color, yLabel) {
+  const canvas=$(canvasId); if(!canvas) return;
+  const ctx=canvas.getContext('2d');
+  const width=canvas.clientWidth||canvas.offsetWidth||canvas.parentElement?.offsetWidth||600;
+  const height=Math.max(canvas.clientHeight||canvas.offsetHeight,170);
+  const W=Math.floor(width*window.devicePixelRatio);
+  const H=Math.floor(height*window.devicePixelRatio);
+  if(canvas.width!==W||canvas.height!==H){ canvas.width=W; canvas.height=H; }
+  const dpr=window.devicePixelRatio||1;
+  ctx.clearRect(0,0,W,H);
+  if(!ts||!ys||ts.length<2) return;
+
+  const pad={top:14*dpr,right:12*dpr,bottom:24*dpr,left:44*dpr};
+  const cw=W-pad.left-pad.right; const ch=H-pad.top-pad.bottom;
+  const validYs=ys.filter(v=>Number.isFinite(v));
+  if(!validYs.length) return;
+  const yMin=Math.min(...validYs); const yMax=Math.max(...validYs);
+  const yRange=yMax-yMin||1;
+  const xMin=ts[0]; const xMax=ts[ts.length-1]||1; const xRange=xMax-xMin||1;
+
+  // Background
+  ctx.fillStyle='rgba(12,15,26,0.4)'; ctx.fillRect(0,0,W,H);
+  // Grid
+  ctx.strokeStyle='rgba(30,36,56,0.8)'; ctx.lineWidth=0.5*dpr;
+  for(let i=0;i<=4;i++){
+    const y=pad.top+ch*(1-i/4);
+    ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(pad.left+cw,y); ctx.stroke();
+    ctx.fillStyle='rgba(90,96,128,0.9)'; ctx.font=`${9*dpr}px JetBrains Mono,monospace`;
+    const val=yMin+yRange*(i/4); ctx.fillText(val.toFixed(2),2*dpr,y+3*dpr);
+  }
+  // Line
+  const step=Math.max(1,Math.floor(ts.length/400));
+  ctx.beginPath(); ctx.strokeStyle=color; ctx.lineWidth=1.5*dpr; ctx.lineJoin='round';
+  let first=true;
+  for(let i=0;i<ts.length;i+=step){
+    if(!Number.isFinite(ys[i])) continue;
+    const px=pad.left+cw*(ts[i]-xMin)/xRange;
+    const py=pad.top+ch*(1-(ys[i]-yMin)/yRange);
+    if(first){ ctx.moveTo(px,py); first=false; } else ctx.lineTo(px,py);
+  }
+  ctx.stroke();
+  // Glow line
+  ctx.beginPath(); ctx.strokeStyle=color; ctx.globalAlpha=0.18; ctx.lineWidth=4*dpr;
+  first=true;
+  for(let i=0;i<ts.length;i+=step){
+    if(!Number.isFinite(ys[i])) continue;
+    const px=pad.left+cw*(ts[i]-xMin)/xRange;
+    const py=pad.top+ch*(1-(ys[i]-yMin)/yRange);
+    if(first){ ctx.moveTo(px,py); first=false; } else ctx.lineTo(px,py);
+  }
+  ctx.stroke(); ctx.globalAlpha=1;
+  // X axis label
+  ctx.fillStyle='rgba(90,96,128,0.9)'; ctx.font=`${8.5*dpr}px JetBrains Mono,monospace`;
+  ctx.fillText('t(s)',pad.left+cw-14*dpr,H-4*dpr);
+  ctx.fillText(yLabel,pad.left,pad.top-2*dpr);
+}
+
+function drawEmptyCharts() {
+  ['chart-energy','chart-accel','chart-pos'].forEach(id=>{ const c=$(id); if(c){ c.width=c.clientWidth||600; c.height=170; } });
+}
+
+function redrawCharts() {
+  if(!appState.simResult||!appState.analysisResult){ drawEmptyCharts(); return; }
+  requestAnimationFrame(()=>{
+    drawChart('chart-energy',appState.simResult.ts,appState.simResult.energies,'var(--accent)','Energy');
+    drawChart('chart-accel',appState.simResult.ts.slice(1,appState.simResult.accels.length+1),appState.simResult.accels,appState.analysisResult.metrics.accelRatio>6?'var(--warn)':'var(--accent2)','|a|');
+    drawChart('chart-pos',appState.simResult.ts,appState.simResult.primary,'var(--warn)',appState.config?.system==='pendulum'?'Angle':'Position');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════
+function switchTab(id,el) {
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  $(id).classList.add('active');
+  if(el&&el.classList&&el.classList.contains('tab')){
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    el.classList.add('active');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// AUTO-FIX
+// ═══════════════════════════════════════════════════════════
+function autoFixConfig() {
+  const config=readConfig(); const analysis=appState.analysisResult;
+  let newDt=config.dt, newInt=config.integrator, newDamp=config.params.damping;
+  if(analysis){
+    if(analysis.metrics.stiffnessIndex>0.45||analysis.metrics.earlyAbort||analysis.metrics.explosionRatio>4) newDt*=0.5;
+    else if(analysis.metrics.stiffnessIndex>0.3) newDt*=0.65;
+    if(config.integrator==='euler') newInt=analysis.metrics.stiffnessIndex>0.35?'rk4':'verlet';
+    if(analysis.metrics.oscRatio>1.1&&newDamp<0.12) newDamp=Math.max(0.12,newDamp+0.1);
+  } else {
+    if(config.integrator==='euler') newInt='verlet';
+    if(config.dt>0.05) newDt=config.dt*0.6;
+    if(config.params.damping<0.1) newDamp=0.15;
+  }
+  newDt=Math.max(0.001,Math.min(0.15,Number(newDt.toFixed(3))));
+  newDamp=Math.max(0,Math.min(2,Number(newDamp.toFixed(2))));
+  $('sel-integrator').value=newInt;
+  $('sl-dt').value=newDt; $('lbl-dt').textContent=newDt.toFixed(3);
+  $('sl-damp').value=newDamp; $('lbl-damp').textContent=newDamp.toFixed(2);
+  UI.previewRisk();
+  addChatMsg('assistant',formatAIText(`**Quick Auto-Fix applied.**\n\n→ Integrator: ${newInt}\n→ dt: ${newDt.toFixed(3)}\n→ damping: ${newDamp.toFixed(2)}\n\nRun the simulation again to verify the improvement.`),true);
+}
+
+// ═══════════════════════════════════════════════════════════
+// PRE-RUN RISK
+// ═══════════════════════════════════════════════════════════
+function estimatePreRunRisk(config) {
+  const idx=(config.system==='spring_mass'||config.system==='pendulum')
+    ? config.dt*Math.sqrt((config.params.k||1)/Math.max(1e-9,config.params.m||1))
+    : config.dt*Math.sqrt((config.params.g||9.81)/Math.max(1e-9,config.params.L||1));
+  if(config.system==='double_pendulum'||config.system==='nbody')
+    return {show:true,message:`<strong>⚠️ Chaotic system.</strong> ${config.system==='double_pendulum'?'Double pendulum':'3-body gravity'} is inherently unpredictable. This is expected — the AI will explain the physics of chaos.`};
+  if(config.integrator==='euler'&&idx>0.24) return {show:true,message:`<strong>High risk.</strong> Euler + high stiffness ratio (${idx.toFixed(2)}) is likely to drift or explode — perfect for a failure demo.`};
+  if(idx>0.55) return {show:true,message:`<strong>Stiff system.</strong> Stiffness index ${idx.toFixed(2)} — consider smaller dt or stronger integrator.`};
+  if(config.params.damping<0.03) return {show:true,message:`<strong>Low damping.</strong> Oscillations may grow dramatically.`};
+  return {show:false,message:''};
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHAT MESSAGES & FORMATTING
+// ═══════════════════════════════════════════════════════════
+function formatAIText(text) {
+  return text
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/\n\n/g,'<br><br>')
+    .replace(/\n/g,'<br>');
+}
+
+function addChatMsg(role,content,isHTML=false) {
+  const area=$('chat-area');
+  const wrapper=document.createElement('div'); wrapper.className=`msg ${role}`;
+  const avatar=document.createElement('div'); avatar.className=`msg-avatar ${role==='assistant'?'ai':'user'}`;
+  avatar.textContent=role==='assistant'?'⚛':'👤';
+  const bubble=document.createElement('div'); bubble.className='msg-bubble';
+  if(isHTML) bubble.innerHTML=content; else bubble.textContent=content;
+  wrapper.appendChild(avatar); wrapper.appendChild(bubble);
+  area.appendChild(wrapper); area.scrollTop=area.scrollHeight;
+  if(role==='assistant') appState.lastAssistantText=bubble.textContent||content;
+}
+
+function addTyping() {
+  const area=$('chat-area');
+  const box=document.createElement('div'); box.className='msg'; box.id='typing-indicator';
+  box.innerHTML='<div class="msg-avatar ai">⚛</div><div class="msg-bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
+  area.appendChild(box); area.scrollTop=area.scrollHeight;
+}
+function removeTyping() { const el=$('typing-indicator'); if(el) el.remove(); }
+
+
+function runIntegratorBenchmark() {
+  const base=readConfig();
+  const integrators=['euler','semi_euler','verlet','rk4'];
+  const results=integrators.map(integrator=>{
+    const cfg={...base, integrator};
+    const result=Physics.simulate(cfg);
+    const analysis=Physics.analyze(result,cfg);
+    return {integrator, score: analysis?analysis.overallScore:0, analysis, config:cfg};
+  }).sort((a,b)=>b.score-a.score);
+
+  const html = ['<div class="summary-card"><strong>Integrator benchmark</strong><br><br>']
+    .concat(results.map((r,i)=>{
+      const color = r.score>=80?'var(--accent)':r.score>=50?'var(--warn)':'var(--danger)';
+      const cause = r.analysis?.rootCauses?.[0]?.cause || 'No major issue';
+      return `<div class="compare-row"><span class="k">${i+1}. ${r.integrator}</span><span class="v" style="color:${color}">${Math.round(r.score)}/100</span></div><div style="font-size:0.62rem;color:var(--muted);margin:4px 0 8px">${cause}</div>`;
+    }))
+    .concat([`<div class="compare-verdict"><strong>Winner:</strong> ${results[0].integrator} with ${Math.round(results[0].score)}/100 on the current setup.</div></div>`]).join('');
+  $('benchmark-results').innerHTML = html;
+  addChatMsg('assistant', formatAIText(`**Integrator benchmark complete.** Best option on the current setup: **${results[0].integrator}** with **${Math.round(results[0].score)}/100**.`), true);
+}
+
+async function copyPresentationSummary() {
+  const text = (document.getElementById('presentation-summary')?.innerText || '').trim();
+  if (!text || text.startsWith('Run a simulation')) {
+    addChatMsg('assistant','Run a simulation first so there is a summary to copy.');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    addChatMsg('assistant','Presentation summary copied to clipboard.');
+  } catch (err) {
+    addChatMsg('assistant','Could not access clipboard on this browser. You can still select and copy the summary manually.');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// LOCAL FALLBACK ANSWERS
+// ═══════════════════════════════════════════════════════════
+function answerGeneralQuestion(q) {
+  const msg=q.toLowerCase();
+  if(msg.includes('euler')) return '**Euler** is the simplest integrator but usually the first to go unstable. It updates using the old derivative only, so error compounds quickly in stiff or oscillatory systems.';
+  if(msg.includes('energy drift')) return '**Energy drift** means the simulation is adding or removing energy that should not be there. It is a warning that the integrator, timestep, or solver is distorting the physics.';
+  if(msg.includes('verlet')) return '**Velocity-Verlet** preserves long-term structure better than Euler. It is symplectic — it conserves a modified Hamiltonian — which makes it far more stable for oscillatory systems.';
+  if(msg.includes('rk4')) return '**RK4** is accurate per step and a good rescue option for stiff cases. It does not preserve energy structure like Verlet but is far better than raw Euler.';
+  if(msg.includes('double pendulum')||msg.includes('chaos')) return '**Double pendulum chaos** is a perfect demo for judges. Nearby initial conditions diverge exponentially (positive Lyapunov exponent). No numerical method can predict the long-term trajectory — the physics itself is unpredictable. This is not a bug; it is chaos theory.';
+  if(msg.includes('stiff')) return 'A **stiff system** has dynamics on very different time scales. It shows up as acceleration spikes, timestep sensitivity, and explosions when dt is too large.';
+  if(msg.includes('judge')||msg.includes('present')) return 'Tell judges: **the tool does three things** — detects instability, explains the probable cause with confidence scores, and recommends the fastest repair. That is more valuable than a generic simulator or chatbot.';
+  if(msg.includes('orbital')||msg.includes('orbit')) return '**Orbital mechanics** is a conservative system — energy should be exactly conserved. Energy drift in an orbit simulation means your integrator is spiraling the planet inward or outward. Verlet (symplectic) handles this much better than Euler.';
+  if(msg.includes('3-body')||msg.includes('nbody')||msg.includes('n-body')) return '**3-body gravity** is another chaotic system with no closed-form solution. It was proven by Poincaré in 1890 that no general analytic solution exists. Our AI can still identify numerical vs. physical sources of instability.';
+  return 'I can help with integrators, damping, energy drift, stiffness, chaos, resonance, benchmark results, or your latest simulation. Ask something specific and I will answer from the physics side.';
+}
+
+function answerQuestion(msg) {
+  const hasSim=!!appState.analysisResult;
+  if(!hasSim) return answerGeneralQuestion(msg);
+  const q=msg.toLowerCase(); const analysis=appState.analysisResult; const config=appState.config;
+  if(q.includes('latest')||q.includes('this simulation')||q.includes('diagnose')||q.includes('what should')||q.includes('explain my')) return localDiagnosisText(config,analysis);
+  if(q.includes('judge')||q.includes('present')) return `**For judges:** this run scored **${analysis.overallScore.toFixed(0)}/100**. Main issue: **${analysis.rootCauses[0]?.cause||'minor numerical error'}**. Quickest fix: **${analysis.fixes[0]?.action||'keep current stable setup'}**.`;
+  if(q.includes('best integrator')) return analysis.metrics.stiffnessIndex>0.35?'For this case, I would use **RK4** for robustness or **Velocity-Verlet** for better long-term energy behavior. Avoid Euler here.':'For this case, **Velocity-Verlet** is a strong choice for long-term stability. RK4 for extra accuracy.';
+  if(q.includes('energy drift')) return `This run had **${(analysis.metrics.energyDrift*100).toFixed(1)}% energy drift** — ${analysis.metrics.energyDrift<0.05?'pretty controlled':'noticeable and worth explaining to judges'}.`;
+  return `${localDiagnosisText(config,analysis)}\n\nAlso: ${answerGeneralQuestion(msg)}`;
+}
+
+function localDiagnosisText(config,analysis) {
+  const health=analysis.overallScore>=80?'**Overall health: stable.** The solver stayed well-behaved.':analysis.overallScore>=50?'**Overall health: marginal.** Numerical error is building up.':'**Overall health: unstable.** Clear signs of divergence detected.';
+  const cause=analysis.rootCauses[0];
+  const fixes=analysis.fixes.slice(0,3).map(f=>`- ${f.action}`);
+  const details=[];
+  if(analysis.metrics.energyDrift>0.05) details.push(`Energy drift reached **${(analysis.metrics.energyDrift*100).toFixed(1)}%** — integrator not preserving system energy.`);
+  if(analysis.metrics.oscRatio>1.15) details.push(`Oscillation envelope grew **${analysis.metrics.oscRatio.toFixed(2)}×** — low damping or timestep-driven pumping.`);
+  if(analysis.metrics.accelRatio>5) details.push(`Acceleration spikes at **${analysis.metrics.accelRatio.toFixed(1)}×** median — classic stiff-system warning.`);
+  if(analysis.metrics.earlyAbort) details.push(`Run stopped early: **${analysis.metrics.abortReason||'state diverged'}**.`);
+  return [health,'',cause?`**Most likely root cause:** ${cause.cause}.`:'',details.join(' '),'','**Best next fixes:**',...fixes].filter(Boolean).join('\n');
+}
+
+function buildPresenterSummary(config,analysis) {
+  const tone=analysis.overallScore>=80?'healthy':analysis.overallScore>=50?'borderline':'failing';
+  const sysNames={spring_mass:'Spring-Mass Chain',pendulum:'Damped Pendulum',double_pendulum:'Double Pendulum (Chaotic)',orbital:'Orbital Mechanics',nbody:'3-Body Gravity (Chaotic)'};
+  return `
+    <span class="badge-pill ${analysis.overallScore>=80?'good':analysis.overallScore>=50?'warn':'danger'}">${tone} system</span>
+    <br><br>
+    <strong>${sysNames[config.system]||config.system}</strong> via <strong>${config.integrator}</strong> scored <strong>${analysis.overallScore.toFixed(0)}/100</strong>. 
+    Most likely issue: <strong>${analysis.rootCauses[0]?.cause||'none'}</strong>. 
+    Fastest repair: <strong>${analysis.fixes[0]?.action||'keep current setup'}</strong>.
+    <br><br>
+    This tool detects instability → benchmarks integrators → explains root cause → auto-tunes parameters → visualizes in 3D. It works on built-in simulations and uploaded external logs.
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════════════════════════
+function exportJSON() {
+  if(!appState.simResult||!appState.analysisResult){ addChatMsg('assistant','Run a simulation first, then export.'); return; }
+  const {xs,...rs}=appState.simResult;
+  downloadFile('physix_ai_result.json',JSON.stringify({config:appState.config,analysis:appState.analysisResult,result:rs},null,2),'application/json');
+}
+function exportReport() {
+  if(!appState.simResult||!appState.analysisResult){ addChatMsg('assistant','Run a simulation first, then export.'); return; }
+  downloadFile('physics_debugger_v2_report.txt',buildDetailedSummary(appState.config,appState.analysisResult,appState.simResult),'text/plain');
+}
+function downloadFile(name,content,type) {
+  const blob=new Blob([content],{type}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=name; a.click(); URL.revokeObjectURL(url);
+}
+function buildDetailedSummary(config,analysis,result) {
+  const sysNames={spring_mass:'Spring-Mass Chain',pendulum:'Damped Pendulum',double_pendulum:'Double Pendulum',orbital:'Orbital Mechanics',nbody:'3-Body Gravity',uploaded:'Uploaded Log'};
+  return ['PHYSIX AI — SIMULATION REPORT','================================',
+    `System: ${sysNames[config.system]||config.system}`,
+    `Integrator: ${config.integrator}`,`dt: ${config.dt.toFixed(4)}`,
+    `Damping: ${config.params.damping.toFixed(3)}`,`Stiffness k: ${config.params.k}`,
+    `Duration: ${config.tEnd}s`,'',
+    `Overall score: ${analysis.overallScore.toFixed(1)}/100`,
+    `Energy drift: ${(analysis.metrics.energyDrift*100).toFixed(2)}%`,
+    `Explosion ratio: ${analysis.metrics.explosionRatio.toFixed(2)}x`,
+    `Oscillation ratio: ${analysis.metrics.oscRatio.toFixed(2)}x`,
+    `Accel spike: ${analysis.metrics.accelRatio?analysis.metrics.accelRatio.toFixed(2):'N/A'}x`,
+    `Stiffness index: ${analysis.metrics.stiffnessIndex.toFixed(3)}`,`Early abort: ${analysis.metrics.earlyAbort}`,'',
+    'Events detected:',
+    ...(analysis.events.length?analysis.events.map(e=>`  - ${e.kind} at t=${e.t.toFixed(3)}s (severity ${(e.severity*100).toFixed(0)}%)`):[' - none']),'',
+    'Root causes:',
+    ...analysis.rootCauses.map((c,i)=>`  ${i+1}. ${c.cause} (${(c.confidence*100).toFixed(0)}%)`),'',
+    'Fixes:',
+    ...analysis.fixes.map(f=>`  [${f.priority}] ${f.action}`),'',
+    `Completion: ${result.completed?'Full duration completed':`Aborted: ${result.abortReason||'unknown'}`}`
+  ].join('\n');
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// FEATURE: LIVE 2D ANIMATION
+// ═══════════════════════════════════════════════════════════
+const Anim = (() => {
+  let raf = null, frame = 0, playing = false, simData = null, speed = 1;
+  const SYS_NAMES = {spring_mass:'Spring-Mass Chain',pendulum:'Damped Pendulum',double_pendulum:'Double Pendulum',orbital:'Orbital Mechanics',nbody:'3-Body Gravity'};
+
+  function getCanvas() { return $('anim-canvas'); }
+  function getCtx() { const c = getCanvas(); return c ? c.getContext('2d') : null; }
+
+  function drawFrame(idx) {
+    const c = getCanvas(); if(!c || !simData) return;
+    const ctx = getCtx();
+    const W = c.clientWidth || 700, H = c.height;
+    c.width = W; // sync pixel width
+
+    ctx.clearRect(0,0,W,H);
+
+    // grid
+    ctx.strokeStyle = 'rgba(0,255,198,0.04)'; ctx.lineWidth = 1;
+    for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+    for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+
+    const i = Math.min(idx, simData.xs.length - 1);
+    const x = simData.xs[i];
+    const config = appState.config;
+    const sys = config?.system || 'spring_mass';
+
+    // ── time label
+    ctx.fillStyle = 'rgba(0,255,198,0.7)'; ctx.font = '11px JetBrains Mono,monospace';
+    ctx.fillText(`t = ${(simData.ts[i]||0).toFixed(3)}s  [ ${SYS_NAMES[sys]||sys} ]`, 14, 22);
+    ctx.fillStyle = 'rgba(90,96,128,0.9)';
+    ctx.fillText(`frame ${i+1} / ${simData.xs.length}`, W - 150, 22);
+
+    // ── progress bar
+    const prog = i / Math.max(1, simData.xs.length - 1);
+    ctx.fillStyle = 'rgba(30,36,56,0.8)'; ctx.fillRect(14, H-18, W-28, 6);
+    const grad = ctx.createLinearGradient(14,0,W-28,0);
+    grad.addColorStop(0,'#00ffc6'); grad.addColorStop(1,'#5b8fff');
+    ctx.fillStyle = grad; ctx.fillRect(14, H-18, (W-28)*prog, 6);
+
+    const CX = W/2, CY = H/2;
+
+    if(sys === 'spring_mass') {
+      const N = config.params?.N || 4;
+      const pos = x ? x.slice(0, N) : Array(N).fill(0);
+      const maxP = Math.max(...pos.map(Math.abs), 0.5);
+      const scale = Math.min(60, (W*0.38) / maxP);
+      const spacing = W / (N + 1);
+      // springs
+      for(let j=0;j<=N;j++){
+        const x1 = j===0 ? 0 : (j-1)*spacing+spacing;
+        const x2 = j===N ? W : j*spacing+spacing;
+        const y1 = CY + (j===0?0:pos[j-1]*scale);
+        const y2 = CY + (j===N?0:pos[j]*scale);
+        // draw zigzag spring
+        ctx.strokeStyle='rgba(91,143,255,0.5)'; ctx.lineWidth=1.5;
+        ctx.setLineDash([4,3]);
+        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      // masses
+      for(let j=0;j<N;j++){
+        const mx = (j+1)*spacing;
+        const my = CY + pos[j]*scale;
+        // glow
+        const g = ctx.createRadialGradient(mx,my,0,mx,my,18);
+        g.addColorStop(0,'rgba(0,255,198,0.35)'); g.addColorStop(1,'transparent');
+        ctx.fillStyle=g; ctx.beginPath(); ctx.arc(mx,my,18,0,Math.PI*2); ctx.fill();
+        // mass circle
+        ctx.fillStyle='#00ffc6'; ctx.beginPath(); ctx.arc(mx,my,9,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle='rgba(0,255,198,0.4)'; ctx.lineWidth=2; ctx.stroke();
+        ctx.fillStyle='#060810'; ctx.font='bold 8px monospace';
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(j+1, mx, my);
+      }
+      // wall anchors
+      ctx.fillStyle='rgba(91,143,255,0.4)';
+      ctx.fillRect(0, CY-20, 6, 40); ctx.fillRect(W-6, CY-20, 6, 40);
+
+    } else if(sys === 'pendulum') {
+      const angle = x ? x[0] : 0;
+      const L = 160;
+      const px = CX + L*Math.sin(angle), py = 80 + L*Math.cos(angle);
+      // rod
+      ctx.strokeStyle='rgba(91,143,255,0.7)'; ctx.lineWidth=2.5;
+      ctx.beginPath(); ctx.moveTo(CX,80); ctx.lineTo(px,py); ctx.stroke();
+      // pivot
+      ctx.fillStyle='rgba(91,143,255,0.5)'; ctx.beginPath(); ctx.arc(CX,80,7,0,Math.PI*2); ctx.fill();
+      // bob glow
+      const g = ctx.createRadialGradient(px,py,0,px,py,24);
+      g.addColorStop(0,'rgba(0,255,198,0.4)'); g.addColorStop(1,'transparent');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(px,py,24,0,Math.PI*2); ctx.fill();
+      // bob
+      ctx.fillStyle='#00ffc6'; ctx.beginPath(); ctx.arc(px,py,13,0,Math.PI*2); ctx.fill();
+      // angle label
+      ctx.fillStyle='rgba(0,255,198,0.8)'; ctx.font='10px JetBrains Mono,monospace'; ctx.textAlign='left'; ctx.textBaseline='top';
+      ctx.fillText(`θ = ${(angle*(180/Math.PI)).toFixed(1)}°`, 14, 38);
+
+    } else if(sys === 'double_pendulum') {
+      const [th1, th2] = x ? [x[0], x[1]] : [0.2, 0.4];
+      const L1=120, L2=100;
+      const ox=CX, oy=70;
+      const x1=ox+L1*Math.sin(th1), y1=oy+L1*Math.cos(th1);
+      const x2=x1+L2*Math.sin(th2), y2=y1+L2*Math.cos(th2);
+      // rods
+      ctx.strokeStyle='rgba(91,143,255,0.7)'; ctx.lineWidth=2.5;
+      ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(x1,y1); ctx.stroke();
+      ctx.strokeStyle='rgba(255,107,107,0.7)';
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+      // pivot
+      ctx.fillStyle='rgba(91,143,255,0.5)'; ctx.beginPath(); ctx.arc(ox,oy,6,0,Math.PI*2); ctx.fill();
+      // joint glow
+      let g2 = ctx.createRadialGradient(x1,y1,0,x1,y1,16);
+      g2.addColorStop(0,'rgba(91,143,255,0.5)'); g2.addColorStop(1,'transparent');
+      ctx.fillStyle=g2; ctx.beginPath(); ctx.arc(x1,y1,16,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#5b8fff'; ctx.beginPath(); ctx.arc(x1,y1,10,0,Math.PI*2); ctx.fill();
+      // bob glow
+      let g3 = ctx.createRadialGradient(x2,y2,0,x2,y2,20);
+      g3.addColorStop(0,'rgba(255,107,107,0.5)'); g3.addColorStop(1,'transparent');
+      ctx.fillStyle=g3; ctx.beginPath(); ctx.arc(x2,y2,20,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#ff6b6b'; ctx.beginPath(); ctx.arc(x2,y2,12,0,Math.PI*2); ctx.fill();
+
+    } else if(sys === 'orbital') {
+      const scale = Math.min(W,H)*0.34;
+      // draw orbit trail (last 60 frames)
+      ctx.strokeStyle='rgba(0,255,198,0.2)'; ctx.lineWidth=1;
+      const start = Math.max(0, i-60);
+      ctx.beginPath();
+      for(let j=start;j<=i&&j<simData.xs.length;j++){
+        const pt=simData.xs[j];
+        const px_=CX+(pt[0]||0)*scale, py_=CY-(pt[1]||0)*scale;
+        j===start?ctx.moveTo(px_,py_):ctx.lineTo(px_,py_);
+      }
+      ctx.stroke();
+      // sun
+      const sg=ctx.createRadialGradient(CX,CY,0,CX,CY,20);
+      sg.addColorStop(0,'rgba(255,184,48,0.8)'); sg.addColorStop(1,'transparent');
+      ctx.fillStyle=sg; ctx.beginPath(); ctx.arc(CX,CY,20,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#ffb830'; ctx.beginPath(); ctx.arc(CX,CY,10,0,Math.PI*2); ctx.fill();
+      // planet
+      const px_=CX+(x[0]||0)*scale, py_=CY-(x[1]||0)*scale;
+      const pg=ctx.createRadialGradient(px_,py_,0,px_,py_,14);
+      pg.addColorStop(0,'rgba(0,255,198,0.5)'); pg.addColorStop(1,'transparent');
+      ctx.fillStyle=pg; ctx.beginPath(); ctx.arc(px_,py_,14,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#00ffc6'; ctx.beginPath(); ctx.arc(px_,py_,7,0,Math.PI*2); ctx.fill();
+
+    } else if(sys === 'nbody') {
+      const scale = Math.min(W,H)*0.28;
+      const bodies = [[x[0]||0,x[1]||0],[x[2]||0,x[3]||0],[x[4]||0,x[5]||0]];
+      const colors = ['#00ffc6','#5b8fff','#ff6b6b'];
+      // trails
+      const trailLen=50;
+      bodies.forEach((b,bi)=>{
+        const start=Math.max(0,i-trailLen);
+        ctx.strokeStyle=colors[bi].replace(')',',0.25)').replace('rgb','rgba'); ctx.lineWidth=1.5;
+        ctx.beginPath();
+        for(let j=start;j<=i&&j<simData.xs.length;j++){
+          const pt=simData.xs[j];
+          const bx=CX+pt[bi*2]*scale, by=CY-pt[bi*2+1]*scale;
+          j===start?ctx.moveTo(bx,by):ctx.lineTo(bx,by);
+        }
+        ctx.stroke();
+      });
+      // bodies
+      bodies.forEach((b,bi)=>{
+        const bx=CX+b[0]*scale, by=CY-b[1]*scale;
+        const g4=ctx.createRadialGradient(bx,by,0,bx,by,18);
+        g4.addColorStop(0,colors[bi].replace(')',',0.4)').replace('rgb','rgba')||'rgba(0,255,198,0.4)');
+        g4.addColorStop(1,'transparent');
+        ctx.fillStyle=g4; ctx.beginPath(); ctx.arc(bx,by,18,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle=colors[bi]; ctx.beginPath(); ctx.arc(bx,by,9,0,Math.PI*2); ctx.fill();
+      });
+    }
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  }
+
+  function loop() {
+    if(!playing || !simData) return;
+    frame = (frame + speed) % simData.xs.length;
+    drawFrame(Math.floor(frame));
+    raf = requestAnimationFrame(loop);
+  }
+
+  function load(data, cfg) {
+    simData = data; frame = 0;
+    const note = $('anim-note');
+    if(note) note.textContent = `Loaded ${data.xs.length} frames · ${SYS_NAMES[cfg.system]||cfg.system} · Use Play to animate.`;
+  }
+  function play() {
+    if(!simData){ alert('Run a simulation first.'); return; }
+    speed = parseFloat($('anim-speed')?.value||1);
+    playing = true; raf = requestAnimationFrame(loop);
+  }
+  function pause() { playing = false; if(raf) cancelAnimationFrame(raf); }
+  function reset() { pause(); frame = 0; if(simData) drawFrame(0); }
+  function setSpeed(s) { speed = parseFloat(s)||1; }
+
+  return { load, play, pause, reset, setSpeed, drawFrame: ()=>drawFrame(Math.floor(frame)) };
+})();
+
+function initAnim() {
+  if(appState.simResult && appState.simResult.xs && appState.simResult.xs.length > 0) {
+    Anim.load(appState.simResult, appState.config);
+    Anim.drawFrame();
+  }
+}
+function animPlay() { Anim.play(); }
+function animPause() { Anim.pause(); }
+function animReset() { Anim.reset(); }
+
+// ═══════════════════════════════════════════════════════════
+// FEATURE: STABILITY HEATMAP
+// ═══════════════════════════════════════════════════════════
+async function runHeatmap() {
+  const btn = $('btn-heatmap');
+  const prog = $('heatmap-progress');
+  const hmFill = $('hm-fill');
+  const hmStep = $('hm-step');
+  if(!appState.config){ addChatMsg('assistant','Run a simulation first so I know which system and integrator to use for the heatmap.'); return; }
+  btn.disabled = true; btn.textContent = '⏳ Computing…';
+  prog.style.display = 'block';
+  $('heatmap-legend').style.display = 'none';
+
+  const DT_VALS   = [0.005, 0.01, 0.02, 0.035, 0.05, 0.075, 0.1, 0.125, 0.15, 0.18];
+  const DAMP_VALS = [0.0, 0.05, 0.1, 0.2, 0.35, 0.5, 0.7, 0.9, 1.2, 1.8];
+  const grid = []; let done = 0; const total = DT_VALS.length * DAMP_VALS.length;
+
+  for(let di=0;di<DAMP_VALS.length;di++){
+    const row = [];
+    for(let ti=0;ti<DT_VALS.length;ti++){
+      const cfg = JSON.parse(JSON.stringify(appState.config));
+      cfg.dt = DT_VALS[ti];
+      cfg.params.damping = DAMP_VALS[di];
+      cfg.tEnd = Math.min(cfg.tEnd, 5);
+      let score = 0;
+      try {
+        const result = Physics.simulate(cfg);
+        const analysis = Physics.analyze(result, cfg);
+        score = analysis ? analysis.overallScore : 0;
+      } catch(e) { score = 0; }
+      row.push(score);
+      done++;
+      if(done % 5 === 0) {
+        const pct = (done/total*100).toFixed(0);
+        hmFill.style.width = pct+'%';
+        hmStep.textContent = done;
+        await new Promise(r => setTimeout(r, 0));
+      }
+    }
+    grid.push(row);
+  }
+
+  // draw heatmap
+  const canvas = $('heatmap-canvas');
+  const ctx = canvas.getContext('2d');
+  const CW = canvas.width, CH = canvas.height;
+  const padL=56, padB=36, padT=16, padR=12;
+  const cellW = (CW-padL-padR)/DT_VALS.length;
+  const cellH = (CH-padT-padB)/DAMP_VALS.length;
+
+  ctx.clearRect(0,0,CW,CH);
+  ctx.fillStyle='#04080f'; ctx.fillRect(0,0,CW,CH);
+
+  let bestScore=-1, bestDt=0, bestDamp=0;
+
+  for(let di=0;di<DAMP_VALS.length;di++){
+    for(let ti=0;ti<DT_VALS.length;ti++){
+      const s = grid[di][ti];
+      const x = padL + ti*cellW, y = padT + (DAMP_VALS.length-1-di)*cellH;
+      const r = s<50 ? 255 : Math.round(255*(1-(s-50)/50));
+      const g = s<50 ? Math.round(255*s/50) : 255;
+      const b = s>80 ? Math.round(198*(s-80)/20) : 0;
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(x, y, cellW-1, cellH-1);
+      // score text if cell big enough
+      if(cellW > 38){
+        ctx.fillStyle = s > 50 ? '#060810':'#fff';
+        ctx.font = 'bold 9px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(Math.round(s), x+cellW/2, y+cellH/2);
+      }
+      if(s > bestScore){ bestScore=s; bestDt=DT_VALS[ti]; bestDamp=DAMP_VALS[di]; }
+    }
+  }
+
+  // axes
+  ctx.fillStyle='rgba(90,96,128,0.9)'; ctx.font='9px JetBrains Mono,monospace'; ctx.textAlign='center';
+  DT_VALS.forEach((v,ti)=>{
+    ctx.fillText('Δt='+v, padL+ti*cellW+cellW/2, CH-8);
+  });
+  ctx.textAlign='right';
+  DAMP_VALS.forEach((v,di)=>{
+    ctx.fillText('d='+v, padL-4, padT+(DAMP_VALS.length-1-di)*cellH+cellH/2+3);
+  });
+
+  // axis labels
+  ctx.save(); ctx.translate(10, CH/2); ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center'; ctx.fillStyle='rgba(91,143,255,0.8)'; ctx.font='10px JetBrains Mono,monospace';
+  ctx.fillText('DAMPING', 0, 0); ctx.restore();
+  ctx.textAlign='center'; ctx.fillStyle='rgba(0,255,198,0.8)';
+  ctx.fillText('TIMESTEP (Δt)', padL+(CW-padL-padR)/2, CH-22);
+
+  prog.style.display='none';
+  $('heatmap-legend').style.display='block';
+  $('heatmap-best').textContent = `✦ Best cell: Δt=${bestDt}, damping=${bestDamp} → score ${Math.round(bestScore)}/100`;
+  btn.disabled=false; btn.textContent='🗺 Regenerate Heatmap';
+  addChatMsg('assistant', formatAIText(`**Stability heatmap complete.**\n\nScanned ${total} parameter combinations. Best stable region: **Δt = ${bestDt}, damping = ${bestDamp}** with score **${Math.round(bestScore)}/100**. Green zones are stable; red zones are explosive.`), true);
+}
+
+// ═══════════════════════════════════════════════════════════
+// FEATURE: SESSION HISTORY
+// ═══════════════════════════════════════════════════════════
+const sessionHistory = [];
+const SYS_SHORT = {spring_mass:'Spring-Mass',pendulum:'Pendulum',double_pendulum:'Double Pend.',orbital:'Orbital',nbody:'3-Body'};
+
+function addToHistory(config, analysis) {
+  const entry = {
+    n: sessionHistory.length + 1,
+    sys: SYS_SHORT[config.system] || config.system,
+    integrator: config.integrator,
+    dt: config.dt,
+    damping: config.params?.damping ?? 0,
+    score: analysis.overallScore,
+    cause: analysis.rootCauses[0]?.cause || 'none',
+    time: new Date().toLocaleTimeString(),
+  };
+  sessionHistory.push(entry);
+  renderHistory();
+}
+
+function renderHistory() {
+  const list = $('history-list'); if(!list) return;
+  const count = $('history-count');
+  if(!sessionHistory.length){
+    if(count) count.textContent='No runs yet this session.';
+    list.innerHTML='<div class="empty-state"><div class="icon">📋</div>Each simulation run will be logged here automatically.</div>';
+    return;
+  }
+  if(count) count.textContent = `${sessionHistory.length} run${sessionHistory.length>1?'s':''} this session`;
+  const best = sessionHistory.reduce((a,b)=>b.score>a.score?b:a);
+  list.innerHTML = [...sessionHistory].reverse().map(e=>{
+    const col = e.score>=80?'var(--accent)':e.score>=50?'var(--warn)':'var(--danger)';
+    const isBest = e === best;
+    return `<div class="history-row${isBest?' history-best':''}">
+      <span class="hr-num">#${e.n}${isBest?' ★':''}</span>
+      <span class="hr-sys"><strong>${e.sys}</strong><br><span style="font-size:0.58rem;color:var(--muted)">${e.cause}</span></span>
+      <span class="hr-int">${e.integrator}<br><span style="font-size:0.58rem">Δt=${e.dt}</span></span>
+      <span class="hr-score" style="color:${col}">${Math.round(e.score)}</span>
+      <span class="hr-time">${e.time}</span>
+    </div>`;
+  }).join('');
+
+  // history score sparkline
+  const wrap = $('history-chart-wrap');
+  if(wrap) wrap.style.display='block';
+  const hc = $('history-chart'); if(!hc) return;
+  hc.width = hc.parentElement.clientWidth || 600;
+  const hctx = hc.getContext('2d');
+  const hw = hc.width, hh = hc.height;
+  hctx.clearRect(0,0,hw,hh);
+  hctx.fillStyle='#0c0f1a'; hctx.fillRect(0,0,hw,hh);
+  if(sessionHistory.length > 1){
+    const xs = sessionHistory.map((_,i)=>16+i*(hw-32)/(sessionHistory.length-1));
+    const ys = sessionHistory.map(e=>hh-16-(e.score/100)*(hh-32));
+    // fill
+    const grd=hctx.createLinearGradient(0,0,0,hh);
+    grd.addColorStop(0,'rgba(0,255,198,0.25)'); grd.addColorStop(1,'rgba(0,255,198,0)');
+    hctx.beginPath(); hctx.moveTo(xs[0],hh-16);
+    xs.forEach((x,i)=>hctx.lineTo(x,ys[i]));
+    hctx.lineTo(xs[xs.length-1],hh-16); hctx.closePath();
+    hctx.fillStyle=grd; hctx.fill();
+    // line
+    hctx.strokeStyle='#00ffc6'; hctx.lineWidth=2;
+    hctx.beginPath(); xs.forEach((x,i)=>i===0?hctx.moveTo(x,ys[i]):hctx.lineTo(x,ys[i])); hctx.stroke();
+    // dots
+    xs.forEach((x,i)=>{
+      hctx.fillStyle=sessionHistory[i].score>=80?'#00ffc6':sessionHistory[i].score>=50?'#ffb830':'#ff4060';
+      hctx.beginPath(); hctx.arc(x,ys[i],4,0,Math.PI*2); hctx.fill();
+    });
+  }
+}
+
+function clearHistory() {
+  sessionHistory.length = 0;
+  renderHistory();
+  addChatMsg('assistant','Session history cleared.');
+}
+
+
+window.addEventListener('resize',()=>{
+  redrawCharts();
+  if(renderer3D&&$('viewer-3d')){
+    const c=$('viewer-3d');
+    renderer3D.setSize(c.clientWidth,c.clientHeight);
+    camera3D.aspect=c.clientWidth/c.clientHeight;
+    camera3D.updateProjectionMatrix();
+  }
+});
+
+UI.init();
+</script>
+</body>
+</html>
